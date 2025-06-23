@@ -1,0 +1,9 @@
+linters:
+  # Disable all linters
+  disable-all: true
+  enable:
+    - gofmt
+
+issues:
+  exclude-dirs:
+    - vendor

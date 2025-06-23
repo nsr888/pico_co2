@@ -1,22 +1,20 @@
-run:
-	mpremote run main.py
-push_main:
-	mpremote fs cp main.py :main.py
-push_RTC:
-	mpremote fs cp RTC_DS3231.py :RTC_DS3231.py
-pull_main:
-	mpremote fs cp :main.py main.py
-ls:
-	mpremote fs ls
-pull_all:
-	mpremote fs cp :main.py main.py
-	mpremote fs cp :AHT21.py AHT21.py
-	mpremote fs cp :ENS160.py ENS160.py
-	mpremote fs cp :RTC_DS3231.py RTC_DS3231.py
-	mpremote fs cp :ens160_state.dat ens160_state.dat
-	mpremote fs cp :last_readings.json last_readings.json
-	mpremote fs cp :picozero.py picozero.py
-	mpremote fs cp :settings.py settings.py
-	mpremote fs cp :smile_faces.py smile_faces.py
-	mpremote fs cp :ssd1306.py ssd1306.py
-
+vi_pico2w:
+	tinygo-edit --target pico2-w --editor nvim --wait
+vi_pico:
+	tinygo-edit --target pico --editor nvim --wait
+vscode:
+	tinygo-edit --target pico --editor code --wait
+flash_pico:
+	tinygo flash -target=pico -monitor
+flash_pico2w:
+	tinygo flash -target=pico2-w -monitor
+build_pico:
+	tinygo build -target=pico -o main.uf2
+build_pico2w:
+	tinygo build -target=pico2-w -o main.uf2
+version:
+	go version
+	tinygo version
+	tinygo-edit --version
+install_tinygo_edit:
+	go install github.com/sago35/tinygo-edit@latest
