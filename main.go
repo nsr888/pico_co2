@@ -65,12 +65,18 @@ func (f *FontDisplay) DisplayAHT20Readings(r Readings) {
 		return
 	}
 	f.clear()
-	f.font.Configure(font.Config{FontType: font.FONT_11x18})
-	f.font.XPos = 0
+	f.font.Configure(font.Config{FontType: font.FONT_16x26})
+	tempStr := fmt.Sprintf("%.0f", r.Temperature)
+	f.font.XPos = int16((128 - (len(tempStr) * 16)) / 2)
 	f.font.YPos = 0
-	f.font.PrintText(fmt.Sprintf("Temp: %.1fC", r.Temperature))
-	f.font.YPos = 16
-	f.font.PrintText(fmt.Sprintf("Hum:  %.1f%%", r.Humidity))
+	f.font.PrintText(tempStr)
+
+	// Small font
+	f.font.Configure(font.Config{FontType: font.FONT_6x8})
+	formatString := fmt.Sprintf("Temp %.1fC Hum %.1f%%", r.Temperature, r.Humidity)
+	f.font.XPos = int16((128 - (len(formatString) * 6)) / 2)
+	f.font.YPos = 24
+	f.font.PrintText(formatString)
 }
 
 func (f *FontDisplay) DisplayFullReadings(r Readings) {
@@ -78,21 +84,64 @@ func (f *FontDisplay) DisplayFullReadings(r Readings) {
 		return
 	}
 	f.clear()
+
+	// Big numbers for eCO2 and AQI
+	f.font.Configure(font.Config{FontType: font.FONT_16x26})
+	f.font.XPos = 0
+	f.font.YPos = 0
+	f.font.PrintText(fmt.Sprintf("%d", r.ECO2))
+	tempStr := fmt.Sprintf("%.0f", r.Temperature)
+	f.font.XPos = int16(128 - (len(tempStr) * 16))
+	f.font.YPos = 0
+	f.font.PrintText(tempStr)
+
+	// Small font
+	f.font.Configure(font.Config{FontType: font.FONT_6x8})
+	co2Str := "eCO2"
+	f.font.XPos = 0
+	f.font.YPos = 24
+	f.font.PrintText(co2Str)
+	tempTitleStr := "Temp"
+	f.font.XPos = int16(128 - (len(tempTitleStr) * 6))
+	f.font.YPos = 24
+	f.font.PrintText(tempTitleStr)
+	f.font.XPos = int16(128-(len(r.Status)*6)) / 2
+	f.font.YPos = 24
+	f.font.PrintText(r.Status)
+}
+
+func (f *FontDisplay) DisplayFullReadingsCO2andAQI(r Readings) {
+	if f == nil {
+		return
+	}
+	f.clear()
+
+	// Big numbers for eCO2 and AQI
+	f.font.Configure(font.Config{FontType: font.FONT_11x18})
+	f.font.XPos = 30
+	f.font.YPos = 0
+	f.font.PrintText(fmt.Sprintf("%d", r.ECO2))
+	f.font.XPos = 110
+	f.font.YPos = 0
+	f.font.PrintText(fmt.Sprintf("%d", r.AQI))
+
+	// Small font
 	f.font.Configure(font.Config{FontType: font.FONT_6x8})
 	f.font.XPos = 0
 	f.font.YPos = 0
-	f.font.PrintText(fmt.Sprintf("AQI:  %d", r.AQI))
-	f.font.YPos = 8
-	f.font.PrintText(fmt.Sprintf("eCO2: %d", r.ECO2))
-	f.font.YPos = 16
-	f.font.PrintText(fmt.Sprintf("TVOC: %d", r.TVOC))
-	f.font.YPos = 24
-	f.font.PrintText(fmt.Sprintf("Status: %s", r.Status))
-	f.font.XPos = 64
+	f.font.PrintText("eCO2")
+	f.font.XPos = 87
 	f.font.YPos = 0
-	f.font.PrintText(fmt.Sprintf("Temp: %.1fC", r.Temperature))
-	f.font.YPos = 8
-	f.font.PrintText(fmt.Sprintf("Hum:  %.1f%%", r.Humidity))
+	f.font.PrintText("AQI")
+	f.font.XPos = 0
+	f.font.YPos = 16
+	f.font.PrintText("-----------------------")
+	f.font.XPos = 0
+	f.font.YPos = 24
+	f.font.PrintText(fmt.Sprintf("T %.0f H %.0f", r.Temperature, r.Humidity))
+	f.font.XPos = int16(128 - (len(r.Status) * 6))
+	f.font.YPos = 24
+	f.font.PrintText(r.Status)
 }
 
 // Readings represents sensor data
@@ -196,11 +245,12 @@ func (d *SensorDevice) readSensors() (Readings, error) {
 	r.Temperature = d.aht20Sensor.Celsius()
 	r.Humidity = d.aht20Sensor.RelHumidity()
 
-	if err := d.ens160Sensor.SetEnvData(r.Humidity, r.Temperature); err != nil {
+	if err := d.ens160Sensor.SetEnvData(r.Temperature, r.Humidity); err != nil {
 		return r, fmt.Errorf("failed to set environment data for ENS160: %w", err)
 	}
 
-	err = d.ens160Sensor.Read(ens160.WithWaitForNew(), ens160.WithValidityCheck())
+	// err = d.ens160Sensor.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
+	err = d.ens160Sensor.Read()
 	if err != nil {
 		return r, fmt.Errorf("%w: %v", ErrENS160ReadError, err)
 	}
@@ -208,7 +258,7 @@ func (d *SensorDevice) readSensors() (Readings, error) {
 	r.AQI = d.ens160Sensor.LastAQI()
 	r.ECO2 = d.ens160Sensor.LastCO2()
 	r.TVOC = d.ens160Sensor.LastTVOC()
-	r.Status = ens160.AQIString(d.ens160Sensor.LastAQI())
+	r.Status = ens160.CO2String(d.ens160Sensor.LastCO2())
 
 	return r, nil
 }

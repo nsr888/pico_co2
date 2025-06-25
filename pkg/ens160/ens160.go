@@ -34,6 +34,7 @@ func New(bus *machine.I2C, address uint8) *Device {
 func (d *Device) GetOperatingMode() (uint8, error) {
 	data := []uint8{0}
 	err := d.bus.ReadRegister(d.address, regOperatingMode, data)
+
 	return data[0], err
 }
 
@@ -45,6 +46,7 @@ func (d *Device) SetOperatingMode(mode uint8) error {
 		mode != ModeReset {
 		return errors.New("invalid operating mode")
 	}
+
 	return d.bus.WriteRegister(d.address, regOperatingMode, []uint8{mode})
 }
 
@@ -55,7 +57,25 @@ func (d *Device) GetRawCO2() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return uint16(data[0]) | uint16(data[1])<<8, nil
+}
+
+func CO2String(value uint16) string {
+	switch {
+	case value < 400:
+		return "No data"
+	case value < 600:
+		return "Excellent"
+	case value < 800:
+		return "Good"
+	case value < 1000:
+		return "Fair"
+	case value < 1500:
+		return "Poor"
+	default:
+		return "Bad"
+	}
 }
 
 // GetRawTVOC reads the calculated Total Volatile Organic Compounds
@@ -66,18 +86,15 @@ func (d *Device) GetRawTVOC() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return uint16(data[0]) | uint16(data[1])<<8, nil
 }
 
 // GetRawAQI reads the calculated Air Quality Index (1-5).
-// 1 = Excellent
-// 2 = Good
-// 3 = Moderate
-// 4 = Poor
-// 5 = Unhealthy
 func (d *Device) GetRawAQI() (uint8, error) {
 	data := []uint8{0}
 	err := d.bus.ReadRegister(d.address, regAQI, data)
+
 	return data[0], err
 }
 
@@ -140,6 +157,7 @@ func (d *Device) Reset() error {
 func (d *Device) GetState() ([]byte, error) {
 	data := make([]byte, 6)
 	err := d.bus.ReadRegister(d.address, regStatus, data)
+
 	return data, err
 }
 
@@ -148,6 +166,7 @@ func (d *Device) SetState(state []byte) error {
 	if len(state) != 6 {
 		return errors.New("ENS160 state must be exactly 6 bytes")
 	}
+
 	return d.bus.WriteRegister(d.address, regStatus, state)
 }
 
