@@ -10,6 +10,18 @@ import (
 	"machine"
 )
 
+// ErrInitialStartUpPhase indicates the device is in its initial startup phase.
+// The device requires 1 hour of continuous operation after first power-on.
+// After 24 hours of continuous operation, this status is stored in non-volatile memory.
+// If unpowered before 24 hours, the device will resume initial startup mode after re-powering.
+var ErrInitialStartUpPhase = errors.New("initial startup required")
+
+// ErrWarmUpPhase indicates readings are unavailable during the 3-minute warm-up period.
+var ErrWarmUpPhase = errors.New("warmup in progress")
+
+// ErrNoValidOutput indicates sensor signals are out of range or invalid.
+var ErrNoValidOutput = errors.New("no valid output")
+
 // Device wraps an I2C connection to an ENS160 device.
 type Device struct {
 	bus      *machine.I2C
@@ -266,15 +278,13 @@ func (d *Device) ReadValidityFlag() (uint8, error) {
 
 func ValidityFlagToString(flag uint8) string {
 	switch flag {
-	case 0:
+	case ValidityNormalOperation:
 		return "Normal operation"
-	case 1:
-		return "Warm-Up phase" +
-			" (ENS160 readings not available yet - Warming up requires 3 minutes)"
-	case 2:
-		return "Initial Start-Up phase" +
-			" (ENS160 readings unavailable - 1 hour startup required after first power on)"
-	case 3:
+	case ValidityWarmUpPhase:
+		return "Warm-Up phase"
+	case ValidityInitialStartUpPhase:
+		return "Initial Start-Up phase"
+	case ValidityInvalidOutput:
 		return "Invalid output"
 	default:
 		return "Unknown validity flag"
@@ -400,11 +410,11 @@ func (d *Device) Read(opts ...ReadOption) error {
 	if options.withValidityCheck {
 		switch validityFlag {
 		case ValidityInitialStartUpPhase:
-			return fmt.Errorf("ENS160 readings unavailable - 1 hour startup required after first power on")
+			return ErrInitialStartUpPhase
 		case ValidityWarmUpPhase:
-			return fmt.Errorf("ENS160 readings not available yet - Warming up requires 3 minutes")
+			return ErrWarmUpPhase
 		case ValidityInvalidOutput:
-			return fmt.Errorf("ENS160 Invalid Status - No valid output")
+			return ErrNoValidOutput
 		}
 	}
 
