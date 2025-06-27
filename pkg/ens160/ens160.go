@@ -168,11 +168,11 @@ func (d *Device) Reset() error {
 	time.Sleep(250 * time.Millisecond)
 
 	// 3) Clear any old GPR data
-	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{ENS160_COMMAND_NOP}); err != nil {
+	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{CommandNop}); err != nil {
 		return err
 	}
 	time.Sleep(150 * time.Millisecond)
-	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{ENS160_COMMAND_CLRGPR}); err != nil {
+	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{CommandClrGpr}); err != nil {
 		return err
 	}
 	time.Sleep(350 * time.Millisecond)
@@ -246,7 +246,7 @@ func (d *Device) ReadGPRDrdy() (bool, error) {
 		return false, err
 	}
 
-	gprDrdy := (status & ENS160_DATA_STATUS_NEWGPR) != 0 // Extract bit 0
+	gprDrdy := (status & DataStatusNewGpr) != 0 // Extract bit 0
 
 	return gprDrdy, nil
 }
@@ -258,7 +258,7 @@ func (d *Device) ReadDataDrdy() (bool, error) {
 		return false, err
 	}
 
-	dataDrdy := (status & ENS160_DATA_STATUS_NEWDAT) != 0 // Extract bit 1
+	dataDrdy := (status & DataStatusNewDat) != 0 // Extract bit 1
 
 	return dataDrdy, nil
 }
@@ -271,7 +271,7 @@ func (d *Device) ReadValidityFlag() (uint8, error) {
 		return 0, err
 	}
 	// Extract bits 2 and 3
-	validityFlag := (status & ENS160_DATA_STATUS_VALIDITY) >> 2
+	validityFlag := (status & DataStatusValidity) >> 2
 
 	return validityFlag, nil
 }
@@ -298,7 +298,7 @@ func (d *Device) ReadStater() (bool, error) {
 		return false, err
 	}
 
-	stater := (status & ENS160_DATA_STATUS_STATER) != 0 // Extract bit 6
+	stater := (status & DataStatusStater) != 0 // Extract bit 6
 
 	return stater, nil
 }
@@ -394,7 +394,7 @@ func (d *Device) Read(opts ...ReadOption) error {
 
 	validityFlag := (status & ENS160_DATA_STATUS_VALIDITY) >> 2
 	stater := (status & ENS160_DATA_STATUS_STATER) != 0
-	dataReady := (status & ENS160_DATA_STATUS_NEWDAT) != 0
+	dataReady := (status & DataStatusNewDat) != 0
 
 	// Check for fatal error state first
 	if stater {
@@ -408,9 +408,9 @@ func (d *Device) Read(opts ...ReadOption) error {
 			if err != nil {
 				return fmt.Errorf("error reading status register: %v", err)
 			}
-			validityFlag = (status & ENS160_DATA_STATUS_VALIDITY) >> 2
-			stater = (status & ENS160_DATA_STATUS_STATER) != 0
-			dataReady = (status & ENS160_DATA_STATUS_NEWDAT) != 0
+			validityFlag = (status & DataStatusValidity) >> 2
+			stater = (status & DataStatusStater) != 0
+			dataReady = (status & DataStatusNewDat) != 0
 
 			if stater {
 				return fmt.Errorf("fatal sensor error during wait (stater flag)")

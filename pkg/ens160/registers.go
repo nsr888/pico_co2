@@ -27,14 +27,14 @@ const (
 	ValidityInvalidOutput       = 0x03
 
 	// Data status flags
-	ENS160_DATA_STATUS_STATAS   = 0x80
-	ENS160_DATA_STATUS_STATER   = 0x40
-	ENS160_DATA_STATUS_VALIDITY = 0x0C
-	ENS160_DATA_STATUS_NEWDAT   = 0x02
-	ENS160_DATA_STATUS_NEWGPR   = 0x01
+	DataStatusStatas   = 0x80
+	DataStatusStater   = 0x40
+	DataStatusValidity = 0x0C
+	DataStatusNewDat   = 0x02
+	DataStatusNewGpr   = 0x01
 
 	// Command codes
-	ENS160_COMMAND_NOP        = 0x00
-	ENS160_COMMAND_GET_APPVER = 0x0E // Get FW Version
-	ENS160_COMMAND_CLRGPR     = 0xCC // Clears GPR Read Registers
+	CommandNop       = 0x00
+	CommandGetAppVer = 0x0E // Get FW Version
+	CommandClrGpr    = 0xCC // Clears GPR Read Registers
 )
