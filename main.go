@@ -203,7 +203,7 @@ func initHardware() (*SensorDevice, error) {
 	d.aht20Sensor = &aht20Sensor
 
 	ens160Sensor := ens160.New(d.i2c, ens160.DefaultAddress)
-	if err := ens160Sensor.Reset(); err != nil {
+	if err := ens160Sensor.Configure(); err != nil {
 		panic(err)
 	}
 	d.ens160Sensor = ens160Sensor

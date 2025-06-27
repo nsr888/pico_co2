@@ -1,5 +1,22 @@
-// Package ens160 provides a driver for
-// the ENS160 Digital Metal-Oxide Multi-Gas Sensor manufactured by ScioSense.
+/*
+Package ens160 provides a driver for the ENS160 Digital Metal-Oxide Multi-Gas
+Sensor manufactured by ScioSense.
+
+Example of usage:
+
+	device := ens160.New(machine.I2C1, ens160.DefaultAddress)
+	if err := device.Configure(); err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		if err := device.Read(ens160.WithWaitForNew(), ens160.WithValidityCheck()); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("eCO2: %d, TVOC: %d, AQI: %d\n", device.LastCO2(), device.LastTVOC(), device.LastAQI())
+		time.Sleep(5 * time.Second)
+	}
+*/
 package ens160
 
 import (
@@ -40,6 +57,15 @@ func New(bus *machine.I2C, address uint8) *Device {
 		bus:     bus,
 		address: address,
 	}
+}
+
+// Configure sets up the sensor by resetting it and putting it into standard mode.
+// Should be called once after New.
+func (d *Device) Configure() error {
+	if err := d.Reset(); err != nil {
+		return err
+	}
+	return d.SetOperatingMode(ModeStandard)
 }
 
 // GetOperatingMode reads the current operating mode of the device.
@@ -127,77 +153,51 @@ func AQIString(value uint8) string {
 	}
 }
 
-// Reset performs a device reset and returns to standard operating mode.
+// Reset performs a device reset and leaves the ENS160 in IDLE mode.
 func (d *Device) Reset() error {
+	// 1) Trigger reset
 	if err := d.SetOperatingMode(ModeReset); err != nil {
 		return err
 	}
 	time.Sleep(time.Second)
 
+	// 2) Go to IDLE (default state after reset)
 	if err := d.SetOperatingMode(ModeIdle); err != nil {
 		return err
 	}
 	time.Sleep(250 * time.Millisecond)
 
-	if err := d.bus.WriteRegister(
-		d.address,
-		regCommand,
-		[]uint8{ENS160_COMMAND_NOP},
-	); err != nil {
+	// 3) Clear any old GPR data
+	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{ENS160_COMMAND_NOP}); err != nil {
 		return err
 	}
 	time.Sleep(150 * time.Millisecond)
-
-	if err := d.bus.WriteRegister(
-		d.address,
-		regCommand,
-		[]uint8{ENS160_COMMAND_CLRGPR},
-	); err != nil {
+	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{ENS160_COMMAND_CLRGPR}); err != nil {
 		return err
 	}
 	time.Sleep(350 * time.Millisecond)
 
-	if err := d.SetOperatingMode(ModeStandard); err != nil {
-		return err
-	}
-	time.Sleep(500 * time.Millisecond)
-
 	return nil
-}
-
-// GetState reads the 6-byte state of the ENS160 for later restoration.
-func (d *Device) GetState() ([]byte, error) {
-	data := make([]byte, 6)
-	err := d.bus.ReadRegister(d.address, regStatus, data)
-
-	return data, err
-}
-
-// SetState restores a previously saved state to the ENS160.
-func (d *Device) SetState(state []byte) error {
-	if len(state) != 6 {
-		return errors.New("ENS160 state must be exactly 6 bytes")
-	}
-
-	return d.bus.WriteRegister(d.address, regStatus, state)
 }
 
 // SetEnvData sets the temperature and humidity data for improved accuracy.
 // temperature is in Celsius, humidity is in percentage.
 func (d *Device) SetEnvData(temperature float32, humidity float32) error {
 	// Convert temperature to Kelvin * 64
-	tempVal := uint16((temperature + 273.15) * 64)
+	tempRaw := uint16((temperature + 273.15) * 64)
 	// Convert humidity to percentage * 512
-	humVal := uint16(humidity * 512)
+	humRaw := uint16(humidity * 512)
 
-	data := []byte{
-		byte(humVal & 0xFF),
-		byte((humVal >> 8) & 0xFF),
-		byte(tempVal & 0xFF),
-		byte((tempVal >> 8) & 0xFF),
-	}
+	tempLSB := byte(tempRaw & 0xFF)
+	tempMSB := byte(tempRaw >> 8)
+	humLSB := byte(humRaw & 0xFF)
+	humMSB := byte(humRaw >> 8)
 
-	return d.bus.WriteRegister(d.address, regRHumIn, data)
+	// write 2 bytes temp @ 0x13, then 2 bytes humidity @ 0x15
+	return d.bus.WriteRegister(d.address, regTempIn, []byte{
+		tempLSB, tempMSB,
+		humLSB, humMSB,
+	})
 }
 
 // ReadStatus reads the status register of the ENS160.
@@ -393,7 +393,13 @@ func (d *Device) Read(opts ...ReadOption) error {
 	}
 
 	validityFlag := (status & ENS160_DATA_STATUS_VALIDITY) >> 2
+	stater := (status & ENS160_DATA_STATUS_STATER) != 0
 	dataReady := (status & ENS160_DATA_STATUS_NEWDAT) != 0
+
+	// Check for fatal error state first
+	if stater {
+		return fmt.Errorf("fatal sensor error (stater flag)")
+	}
 
 	if options.waitForNew {
 		for !dataReady {
@@ -403,7 +409,12 @@ func (d *Device) Read(opts ...ReadOption) error {
 				return fmt.Errorf("error reading status register: %v", err)
 			}
 			validityFlag = (status & ENS160_DATA_STATUS_VALIDITY) >> 2
+			stater = (status & ENS160_DATA_STATUS_STATER) != 0
 			dataReady = (status & ENS160_DATA_STATUS_NEWDAT) != 0
+
+			if stater {
+				return fmt.Errorf("fatal sensor error during wait (stater flag)")
+			}
 		}
 	}
 
