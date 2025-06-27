@@ -310,7 +310,7 @@ func (d *Device) ReadStatas() (bool, error) {
 		return false, err
 	}
 
-	statusFlag := (status & ENS160_DATA_STATUS_STATAS) != 0 // Extract bit 7
+	statusFlag := (status & DataStatusStatas) != 0 // Extract bit 7
 
 	return statusFlag, nil
 }
