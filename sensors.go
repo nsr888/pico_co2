@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"pico_co2/pkg/ens160"
-	"tinygo.org/x/drivers/aht20"
 	"tinygo.org/x/drivers/ds3231"
 )
 
@@ -23,17 +22,12 @@ type Readings struct {
 }
 
 type SensorReader struct {
-	aht20     *aht20.Device
 	airSensor AirQualitySensor
 	ds3231    *ds3231.Device
 }
 
 func NewSensorReader(bus *machine.I2C) (*SensorReader, error) {
-	aht20Sensor := aht20.New(bus)
-	aht20Sensor.Reset()
-	aht20Sensor.Configure()
-
-	airQualitySensor := NewENS160(bus)
+	airQualitySensor := NewENS160AHT20Adapter(bus)
 	if err := airQualitySensor.Configure(); err != nil {
 		return nil, fmt.Errorf("failed to configure air quality sensor: %w", err)
 	}
@@ -44,7 +38,6 @@ func NewSensorReader(bus *machine.I2C) (*SensorReader, error) {
 	}
 
 	return &SensorReader{
-		aht20:     &aht20Sensor,
 		airSensor: airQualitySensor,
 		ds3231:    &ds3231Sensor,
 	}, nil
@@ -57,24 +50,17 @@ func (sr *SensorReader) Read() (Readings, error) {
 	if err != nil {
 		log.Printf("Error reading time: %v", err)
 	}
-
 	r.Timestamp = dt
 
-	if sr.aht20 == nil {
-		return r, fmt.Errorf("AHT20 sensor not initialized")
-	}
-
-	if err := sr.aht20.Read(); err != nil {
-		return r, fmt.Errorf("failed to read AHT20 sensor: %w", err)
-	}
-
-	r.Temperature = sr.aht20.Celsius()
-	r.Humidity = sr.aht20.RelHumidity()
-
-	if err := sr.airSensor.ReadAndCompensate(r.Temperature, r.Humidity); err != nil {
+	if err := sr.airSensor.Read(); err != nil {
+		// Read temp/hum anyway if air quality part fails
+		r.Temperature = sr.airSensor.Temperature()
+		r.Humidity = sr.airSensor.Humidity()
 		return r, fmt.Errorf("%w: %v", ErrAirQualityReadError, err)
 	}
 
+	r.Temperature = sr.airSensor.Temperature()
+	r.Humidity = sr.airSensor.Humidity()
 	r.AQI = sr.airSensor.AQI()
 	r.ECO2 = sr.airSensor.CO2()
 	r.TVOC = sr.airSensor.TVOC()

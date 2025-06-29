@@ -1,58 +1,91 @@
 package main
 
 import (
+	"fmt"
 	"machine"
 
 	"pico_co2/pkg/ens160"
+	"tinygo.org/x/drivers/aht20"
 )
 
-// AirQualitySensor defines the standard interface for an air quality sensor.
+// AirQualitySensor defines the standard interface for a sensor module that
+// provides environmental readings.
 type AirQualitySensor interface {
 	Configure() error
-	// ReadAndCompensate triggers a sensor reading, using temperature and
-	// humidity for compensation if supported by the sensor.
-	ReadAndCompensate(temperature, humidity float32) error
+	Read() error
+	Temperature() float32
+	Humidity() float32
 	CO2() uint16
 	TVOC() uint16
 	AQI() uint8
 }
 
-// ENS160Adapter adapts the ens160.Device to the AirQualitySensor interface.
-type ENS160Adapter struct {
-	device *ens160.Device
+// ENS160AHT20Adapter adapts the combination of an ENS160 and AHT20 sensor
+// to the AirQualitySensor interface.
+type ENS160AHT20Adapter struct {
+	aht20    *aht20.Device
+	ens160   *ens160.Device
+	lastTemp float32
+	lastHum  float32
 }
 
-// NewENS160 creates a new adapter for the ENS160 sensor.
-func NewENS160(bus *machine.I2C) *ENS160Adapter {
-	return &ENS160Adapter{
-		device: ens160.New(bus, ens160.DefaultAddress),
+// NewENS160AHT20Adapter creates a new composite sensor adapter.
+func NewENS160AHT20Adapter(bus *machine.I2C) *ENS160AHT20Adapter {
+	aht20Device := aht20.New(bus)
+	return &ENS160AHT20Adapter{
+		aht20:  &aht20Device,
+		ens160: ens160.New(bus, ens160.DefaultAddress),
 	}
 }
 
-// Configure initializes the sensor.
-func (a *ENS160Adapter) Configure() error {
-	return a.device.Configure()
+// Configure initializes both underlying sensors.
+func (a *ENS160AHT20Adapter) Configure() error {
+	a.aht20.Reset()
+	if err := a.aht20.Configure(); err != nil {
+		return fmt.Errorf("failed to configure AHT20: %w", err)
+	}
+	if err := a.ens160.Configure(); err != nil {
+		return fmt.Errorf("failed to configure ENS160: %w", err)
+	}
+	return nil
 }
 
-// ReadAndCompensate sets environment data and reads the sensor.
-func (a *ENS160Adapter) ReadAndCompensate(temperature, humidity float32) error {
-	if err := a.device.SetEnvData(temperature, humidity); err != nil {
-		return err
+// Read performs a sequential read: first the AHT20 to get temperature and
+// humidity, then the ENS160 using those values for compensation.
+func (a *ENS160AHT20Adapter) Read() error {
+	if err := a.aht20.Read(); err != nil {
+		return fmt.Errorf("failed to read from AHT20: %w", err)
 	}
-	return a.device.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
+	a.lastTemp = a.aht20.Celsius()
+	a.lastHum = a.aht20.RelHumidity()
+
+	if err := a.ens160.SetEnvData(a.lastTemp, a.lastHum); err != nil {
+		return fmt.Errorf("failed to set env data for ENS160: %w", err)
+	}
+	return a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
+}
+
+// Temperature returns the last measured temperature.
+func (a *ENS160AHT20Adapter) Temperature() float32 {
+	return a.lastTemp
+}
+
+// Humidity returns the last measured humidity.
+func (a *ENS160AHT20Adapter) Humidity() float32 {
+	return a.lastHum
 }
 
 // CO2 returns the last measured eCO2 value.
-func (a *ENS160Adapter) CO2() uint16 {
-	return a.device.LastCO2()
+func (a *ENS160AHT20Adapter) CO2() uint16 {
+	return a.ens160.LastCO2()
 }
 
 // TVOC returns the last measured TVOC value.
-func (a *ENS160Adapter) TVOC() uint16 {
-	return a.device.LastTVOC()
+func (a *ENS160AHT20Adapter) TVOC() uint16 {
+	return a.ens160.LastTVOC()
 }
 
 // AQI returns the last measured AQI value.
-func (a *ENS160Adapter) AQI() uint8 {
-	return a.device.LastAQI()
+func (a *ENS160AHT20Adapter) AQI() uint8 {
+	return a.ens160.LastAQI()
 }
