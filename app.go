@@ -13,7 +13,7 @@ const (
 	watchDogMillis    = 8388 // max for RP2040 is 8388ms
 )
 
-var ErrENS160ReadError = errors.New("ENS160 read error")
+var ErrAirQualityReadError = errors.New("air quality sensor read error")
 
 type App struct {
 	led     machine.Pin
@@ -58,9 +58,9 @@ func (a *App) processSensorReadings() {
 	logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
 	logger.Printf("Readings: %+v", readings)
 	switch {
-	case err != nil && !errors.Is(err, ErrENS160ReadError):
+	case err != nil && !errors.Is(err, ErrAirQualityReadError):
 		logger.Panicf("Error reading sensors: %v", err)
-	case errors.Is(err, ErrENS160ReadError):
+	case errors.Is(err, ErrAirQualityReadError):
 		logger.Println(err)
 		a.display.DisplayTempOnly(readings)
 	case readings.AQI == 0 && readings.ECO2 == 0 && readings.TVOC == 0:

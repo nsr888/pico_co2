@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"machine"
 	"time"
 
-	"machine"
+	"pico_co2/pkg/ens160"
 	"tinygo.org/x/drivers/aht20"
 	"tinygo.org/x/drivers/ds3231"
-
-	"pico_co2/pkg/ens160"
 )
 
 // Readings represents sensor data
@@ -24,9 +23,9 @@ type Readings struct {
 }
 
 type SensorReader struct {
-	aht20  *aht20.Device
-	ens160 *ens160.Device
-	ds3231 *ds3231.Device
+	aht20     *aht20.Device
+	airSensor AirQualitySensor
+	ds3231    *ds3231.Device
 }
 
 func NewSensorReader(bus *machine.I2C) (*SensorReader, error) {
@@ -34,9 +33,9 @@ func NewSensorReader(bus *machine.I2C) (*SensorReader, error) {
 	aht20Sensor.Reset()
 	aht20Sensor.Configure()
 
-	ens160Sensor := ens160.New(bus, ens160.DefaultAddress)
-	if err := ens160Sensor.Configure(); err != nil {
-		return nil, fmt.Errorf("failed to configure ENS160 sensor: %w", err)
+	airQualitySensor := NewENS160(bus)
+	if err := airQualitySensor.Configure(); err != nil {
+		return nil, fmt.Errorf("failed to configure air quality sensor: %w", err)
 	}
 
 	ds3231Sensor := ds3231.New(bus)
@@ -45,9 +44,9 @@ func NewSensorReader(bus *machine.I2C) (*SensorReader, error) {
 	}
 
 	return &SensorReader{
-		aht20:  &aht20Sensor,
-		ens160: ens160Sensor,
-		ds3231: &ds3231Sensor,
+		aht20:     &aht20Sensor,
+		airSensor: airQualitySensor,
+		ds3231:    &ds3231Sensor,
 	}, nil
 }
 
@@ -72,19 +71,14 @@ func (sr *SensorReader) Read() (Readings, error) {
 	r.Temperature = sr.aht20.Celsius()
 	r.Humidity = sr.aht20.RelHumidity()
 
-	if err := sr.ens160.SetEnvData(r.Temperature, r.Humidity); err != nil {
-		return r, fmt.Errorf("failed to set environment data for ENS160: %w", err)
+	if err := sr.airSensor.ReadAndCompensate(r.Temperature, r.Humidity); err != nil {
+		return r, fmt.Errorf("%w: %v", ErrAirQualityReadError, err)
 	}
 
-	err = sr.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
-	if err != nil {
-		return r, fmt.Errorf("%w: %v", ErrENS160ReadError, err)
-	}
-
-	r.AQI = sr.ens160.LastAQI()
-	r.ECO2 = sr.ens160.LastCO2()
-	r.TVOC = sr.ens160.LastTVOC()
-	r.Status = ens160.CO2String(sr.ens160.LastCO2())
+	r.AQI = sr.airSensor.AQI()
+	r.ECO2 = sr.airSensor.CO2()
+	r.TVOC = sr.airSensor.TVOC()
+	r.Status = ens160.CO2String(sr.airSensor.CO2())
 
 	return r, nil
 }
