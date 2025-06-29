@@ -5,10 +5,11 @@ import (
 	"log"
 	"time"
 
-	"pico_co2/pkg/ens160"
+	"machine"
 	"tinygo.org/x/drivers/aht20"
 	"tinygo.org/x/drivers/ds3231"
-	"machine"
+
+	"pico_co2/pkg/ens160"
 )
 
 // Readings represents sensor data
@@ -31,9 +32,7 @@ type SensorReader struct {
 func NewSensorReader(bus *machine.I2C) (*SensorReader, error) {
 	aht20Sensor := aht20.New(bus)
 	aht20Sensor.Reset()
-	if err := aht20Sensor.Configure(); err != nil {
-		return nil, fmt.Errorf("failed to configure AHT20 sensor: %w", err)
-	}
+	aht20Sensor.Configure()
 
 	ens160Sensor := ens160.New(bus, ens160.DefaultAddress)
 	if err := ens160Sensor.Configure(); err != nil {
@@ -41,8 +40,8 @@ func NewSensorReader(bus *machine.I2C) (*SensorReader, error) {
 	}
 
 	ds3231Sensor := ds3231.New(bus)
-	if err := ds3231Sensor.Configure(); err != nil {
-		return nil, fmt.Errorf("failed to configure DS3231 sensor: %w", err)
+	if ok := ds3231Sensor.Configure(); !ok {
+		return nil, fmt.Errorf("failed to configure DS3231 sensor")
 	}
 
 	return &SensorReader{
@@ -77,8 +76,7 @@ func (sr *SensorReader) Read() (Readings, error) {
 		return r, fmt.Errorf("failed to set environment data for ENS160: %w", err)
 	}
 
-	// err = sr.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
-	err = sr.ens160.Read()
+	err = sr.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
 	if err != nil {
 		return r, fmt.Errorf("%w: %v", ErrENS160ReadError, err)
 	}
