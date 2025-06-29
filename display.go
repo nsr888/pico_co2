@@ -16,6 +16,28 @@ const (
 	displayAddress = ssd1306.Address_128_32
 )
 
+func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
+	display := ssd1306.NewI2C(bus)
+	display.Configure(ssd1306.Config{
+		Width:   displayWidth,
+		Height:  displayHeight,
+		Address: displayAddress,
+	})
+	log.Printf("Display configured: Width=%d, Height=%d, Address=%#x", displayWidth, displayHeight, displayAddress)
+
+	clear := func() {
+		display.ClearBuffer()
+		display.Display()
+	}
+	clear()
+
+	fontLib := font.NewDisplay(display)
+	return &FontDisplay{
+		font:  &fontLib,
+		clear: clear,
+	}, nil
+}
+
 type FontDisplay struct {
 	font  *font.Display
 	clear func()

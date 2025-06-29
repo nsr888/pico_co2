@@ -1,17 +1,10 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"log"
-	"time"
-
-	font "github.com/Nondzu/ssd1306_font"
 	"machine"
-	"tinygo.org/x/drivers/aht20"
-	"tinygo.org/x/drivers/ds3231"
-	"tinygo.org/x/drivers/ssd1306"
-
-	"pico_co2/pkg/ens160"
+	"time"
 )
 
 // Application Logic
@@ -20,118 +13,59 @@ const (
 	watchDogMillis    = 8388 // max for RP2040 is 8388ms
 )
 
-
-var ErrENS160ReadError = fmt.Errorf("ENS160 read error")
+var ErrENS160ReadError = errors.New("ENS160 read error")
 
 type App struct {
-	i2c               *machine.I2C
-	font              *font.Display
-	fontDisplay       *FontDisplay
-	display           *ssd1306.Device
-	displayScreenNum  int
-	led               machine.Pin
-	ensCalibrated     bool
-	ensStateSaved     bool
-	lastValues        *Readings
-	samplesUploaded   uint32
-	startupCalTime    int64
-	nextStateSaveTime int64
-	aht20Sensor       *aht20.Device
-	ens160Sensor      *ens160.Device
-	ds3231Sensor      *ds3231.Device
+	led     machine.Pin
+	sensors *SensorReader
+	display *FontDisplay
 }
 
-func (a *App) ClearDisplay() {
-	if a.display != nil {
-		a.display.ClearBuffer()
-		a.display.ClearDisplay()
+// NewApp creates a new App instance with its dependencies.
+func NewApp(led machine.Pin, sensors *SensorReader, display *FontDisplay) *App {
+	return &App{
+		led:     led,
+		sensors: sensors,
+		display: display,
 	}
 }
 
-// NewApp initializes hardware and returns a new App instance.
-func NewApp() (*App, error) {
-	app := &App{
-		led: machine.LED,
+// Run starts the main application loop.
+func (a *App) Run() {
+	wd := machine.Watchdog
+	config := machine.WatchdogConfig{
+		TimeoutMillis: watchDogMillis,
 	}
-	log.Printf("Setting up led")
-	app.led.Configure(machine.PinConfig{Mode: machine.PinOutput})
-	const timeout = 3
-	app.playBoardLed(timeout)
-	log.Printf("Ready to go")
+	wd.Configure(config)
+	wd.Start()
+	log.Printf("starting loop")
 
-	if err := app.initI2C(); err != nil {
-		return nil, err
-	}
-
-	if err := app.initDisplay(); err != nil {
-		return nil, err
-	}
-
-	if err := app.initSensors(); err != nil {
-		return nil, err
-	}
-
-	return app, nil
-}
-
-func (a *App) initI2C() error {
-	err := machine.I2C0.Configure(machine.I2CConfig{
-		Frequency: i2cFreq,
-		SDA:       SDAPin,
-		SCL:       SCLPin,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to configure I2C: %w", err)
-	}
-	a.i2c = machine.I2C0
-	log.Printf("I2C configuration: SDA=%v, SCL=%v, Frequency=%dHz", SDAPin, SCLPin, i2cFreq)
-	return nil
-}
-
-func (a *App) initDisplay() error {
-	display := ssd1306.NewI2C(a.i2c)
-	display.Configure(ssd1306.Config{
-		Width:   displayWidth,
-		Height:  displayHeight,
-		Address: displayAddress,
-	})
-	log.Printf("Display configured: Width=%d, Height=%d, Address=%d", displayWidth, displayHeight, displayAddress)
-
-	a.display = &display
-	a.ClearDisplay()
-
-	fontLib := font.NewDisplay(display)
-	a.fontDisplay = &FontDisplay{
-		font:  &fontLib,
-		clear: a.ClearDisplay,
-	}
-	return nil
-}
-
-func (a *App) initSensors() error {
-	aht20Sensor := aht20.New(a.i2c)
-	aht20Sensor.Reset()
-	aht20Sensor.Configure()
-	a.aht20Sensor = &aht20Sensor
-
-	ens160Sensor := ens160.New(a.i2c, ens160.DefaultAddress)
-	if err := ens160Sensor.Configure(); err != nil {
-		return fmt.Errorf("failed to configure ENS160 sensor: %w", err)
-	}
-	a.ens160Sensor = ens160Sensor
-
-	ds3231Sensor := ds3231.New(a.i2c)
-	ds3231Sensor.Configure()
-	a.ds3231Sensor = &ds3231Sensor
-
-	return nil
-}
-
-func (a *App) playBoardLed(count int) {
-	for i := 0; i < count; i++ {
+	a.led.Low()
+	for {
 		a.led.High()
-		time.Sleep(time.Millisecond * 500)
+
+		readings, err := a.sensors.Read()
+		logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
+		logger.Printf("Readings: %+v", readings)
+		switch {
+		case err != nil && !errors.Is(err, ErrENS160ReadError):
+			logger.Panicf("Error reading sensors: %v", err)
+		case errors.Is(err, ErrENS160ReadError):
+			logger.Println(err)
+			a.display.DisplayAHT20Readings(readings)
+		case readings.AQI == 0 && readings.ECO2 == 0 && readings.TVOC == 0:
+			logger.Println("ENS160 readings are zero, displaying AHT20 data only")
+			a.display.DisplayAHT20Readings(readings)
+		default:
+			a.display.DisplayFullReadings(readings)
+		}
+
+		time.Sleep(time.Millisecond * 200)
 		a.led.Low()
-		time.Sleep(time.Millisecond * 500)
+
+		for i := 0; i < sampleTimeSeconds; i++ {
+			wd.Update()
+			time.Sleep(time.Second)
+		}
 	}
 }
