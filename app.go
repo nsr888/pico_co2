@@ -44,26 +44,30 @@ func (a *App) Run() {
 	for {
 		a.led.High()
 
-		readings, err := a.sensors.Read()
-		logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
-		logger.Printf("Readings: %+v", readings)
-		switch {
-		case err != nil && !errors.Is(err, ErrENS160ReadError):
-			logger.Panicf("Error reading sensors: %v", err)
-		case errors.Is(err, ErrENS160ReadError):
-			logger.Println(err)
-			a.display.DisplayTempOnly(readings)
-		case readings.AQI == 0 && readings.ECO2 == 0 && readings.TVOC == 0:
-			logger.Println("ENS160 readings are zero, displaying AHT20 data only")
-			a.display.DisplayTempOnly(readings)
-		default:
-			a.display.DisplayCO2andTemp(readings)
-		}
+		a.processSensorReadings()
 
 		time.Sleep(time.Millisecond * 200)
 		a.led.Low()
 
 		waitNextSample(sampleTimeSeconds)
+	}
+}
+
+func (a *App) processSensorReadings() {
+	readings, err := a.sensors.Read()
+	logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
+	logger.Printf("Readings: %+v", readings)
+	switch {
+	case err != nil && !errors.Is(err, ErrENS160ReadError):
+		logger.Panicf("Error reading sensors: %v", err)
+	case errors.Is(err, ErrENS160ReadError):
+		logger.Println(err)
+		a.display.DisplayTempOnly(readings)
+	case readings.AQI == 0 && readings.ECO2 == 0 && readings.TVOC == 0:
+		logger.Println("ENS160 readings are zero, displaying AHT20 data only")
+		a.display.DisplayTempOnly(readings)
+	default:
+		a.display.DisplayCO2andTemp(readings)
 	}
 }
 
