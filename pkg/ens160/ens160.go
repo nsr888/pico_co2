@@ -2,6 +2,8 @@
 Package ens160 provides a driver for the ENS160 Digital Metal-Oxide Multi-Gas
 Sensor manufactured by ScioSense.
 
+Datasheet: https://www.sciosense.com/wp-content/uploads/2023/12/ENS160-Datasheet.pdf
+
 Example of usage:
 
 	device := ens160.New(machine.I2C1, ens160.DefaultAddress)
@@ -392,8 +394,8 @@ func (d *Device) Read(opts ...ReadOption) error {
 		return fmt.Errorf("error reading status register: %v", err)
 	}
 
-	validityFlag := (status & ENS160_DATA_STATUS_VALIDITY) >> 2
-	stater := (status & ENS160_DATA_STATUS_STATER) != 0
+	validityFlag := (status & DataStatusValidity) >> 2
+	stater := (status & DataStatusStater) != 0
 	dataReady := (status & DataStatusNewDat) != 0
 
 	// Check for fatal error state first

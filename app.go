@@ -62,12 +62,12 @@ func (a *App) processSensorReadings() {
 		logger.Panicf("Error reading sensors: %v", err)
 	case errors.Is(err, ErrAirQualityReadError):
 		logger.Println(err)
-		a.display.DisplayTempOnly(readings)
-	case readings.AQI == 0 && readings.ECO2 == 0 && readings.TVOC == 0:
-		logger.Println("ENS160 readings are zero, displaying AHT20 data only")
-		a.display.DisplayTempOnly(readings)
+		a.display.DisplayBasic(readings)
+	case readings.CO2 == 0 && readings.Temperature != 0:
+		logger.Println("CO2 readings are zero, displaying temperature data only")
+		a.display.DisplayBasic(readings)
 	default:
-		a.display.DisplayCO2andTemp(readings)
+		a.display.DisplayFull(readings)
 	}
 }
 

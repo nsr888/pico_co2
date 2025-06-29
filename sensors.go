@@ -3,20 +3,19 @@ package main
 import (
 	"fmt"
 	"log"
-	"machine"
 	"time"
 
-	"pico_co2/pkg/ens160"
+	"machine"
 	"tinygo.org/x/drivers/ds3231"
+
+	"pico_co2/pkg/ens160"
 )
 
 // Readings represents sensor data
 type Readings struct {
-	AQI         uint8     `json:"aqi"`
-	ECO2        uint16    `json:"eco2"`
-	TVOC        uint16    `json:"tvoc"`
-	Humidity    float32   `json:"humidity"`
+	CO2         uint16    `json:"eco2"`
 	Temperature float32   `json:"temperature"`
+	Humidity    float32   `json:"humidity"`
 	Status      string    `json:"status"`
 	Timestamp   time.Time `json:"timestamp"`
 }
@@ -61,9 +60,7 @@ func (sr *SensorReader) Read() (Readings, error) {
 
 	r.Temperature = sr.airSensor.Temperature()
 	r.Humidity = sr.airSensor.Humidity()
-	r.AQI = sr.airSensor.AQI()
-	r.ECO2 = sr.airSensor.CO2()
-	r.TVOC = sr.airSensor.TVOC()
+	r.CO2 = sr.airSensor.CO2()
 	r.Status = ens160.CO2String(sr.airSensor.CO2())
 
 	return r, nil
