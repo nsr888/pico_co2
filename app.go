@@ -63,9 +63,16 @@ func (a *App) Run() {
 		time.Sleep(time.Millisecond * 200)
 		a.led.Low()
 
-		for i := 0; i < sampleTimeSeconds; i++ {
-			wd.Update()
-			time.Sleep(time.Second)
-		}
+		waitNextSample(sampleTimeSeconds)
+	}
+}
+
+// waitNextSample pauses execution for a given number of seconds
+// while periodically updating the watchdog.
+func waitNextSample(seconds int) {
+	wd := machine.Watchdog
+	for i := 0; i < seconds; i++ {
+		wd.Update()
+		time.Sleep(time.Second)
 	}
 }
