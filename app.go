@@ -52,12 +52,12 @@ func (a *App) Run() {
 			logger.Panicf("Error reading sensors: %v", err)
 		case errors.Is(err, ErrENS160ReadError):
 			logger.Println(err)
-			a.display.DisplayAHT20Readings(readings)
+			a.display.DisplayTempOnly(readings)
 		case readings.AQI == 0 && readings.ECO2 == 0 && readings.TVOC == 0:
 			logger.Println("ENS160 readings are zero, displaying AHT20 data only")
-			a.display.DisplayAHT20Readings(readings)
+			a.display.DisplayTempOnly(readings)
 		default:
-			a.display.DisplayFullReadings(readings)
+			a.display.DisplayCO2andTemp(readings)
 		}
 
 		time.Sleep(time.Millisecond * 200)
