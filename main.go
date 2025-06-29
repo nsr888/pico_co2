@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// I2C Configuration
+const (
+	i2cFreq = 200000
+	SDAPin  = machine.GP4
+	SCLPin  = machine.GP5
+)
+
 func main() {
 	app, err := NewApp()
 	if err != nil {

@@ -20,19 +20,6 @@ const (
 	watchDogMillis    = 8388 // max for RP2040 is 8388ms
 )
 
-// I2C Configuration
-const (
-	i2cFreq = 200000
-	SDAPin  = machine.GP4
-	SCLPin  = machine.GP5
-)
-
-// Display Configuration
-const (
-	displayWidth   = 128
-	displayHeight  = 32
-	displayAddress = ssd1306.Address_128_32
-)
 
 var ErrENS160ReadError = fmt.Errorf("ENS160 read error")
 

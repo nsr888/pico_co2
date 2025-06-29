@@ -2,7 +2,18 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	font "github.com/Nondzu/ssd1306_font"
+	"machine"
+	"tinygo.org/x/drivers/ssd1306"
+)
+
+// Display Configuration
+const (
+	displayWidth   = 128
+	displayHeight  = 32
+	displayAddress = ssd1306.Address_128_32
 )
 
 type FontDisplay struct {
