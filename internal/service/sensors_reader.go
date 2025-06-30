@@ -44,9 +44,6 @@ func (sr *SensorReader) Read() (types.Readings, error) {
 	r.Timestamp = dt
 
 	if err := sr.airSensor.Read(); err != nil {
-		// Read temp/hum anyway if air quality part fails
-		r.Temperature = sr.airSensor.Temperature()
-		r.Humidity = sr.airSensor.Humidity()
 		return r, fmt.Errorf("%w: %v", ErrAirQualityReadError, err)
 	}
 
@@ -62,16 +59,11 @@ func (sr *SensorReader) ProcessSensorReadings() {
 	readings, err := sr.Read()
 	logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
 	logger.Printf("Readings: %+v", readings)
-	switch {
-	case err != nil && !errors.Is(err, ErrAirQualityReadError):
-		logger.Panicf("Error reading sensors: %v", err)
-	case errors.Is(err, ErrAirQualityReadError):
+	
+	if err != nil {
 		logger.Println(err)
-		sr.display.DisplayBasic(readings)
-	case readings.CO2 == 0 && readings.Temperature != 0:
-		logger.Println("CO2 readings are zero, displaying temperature data only")
-		sr.display.DisplayBasic(readings)
-	default:
+		sr.display.DisplayError()
+	} else {
 		sr.display.DisplayFull(readings)
 	}
 }

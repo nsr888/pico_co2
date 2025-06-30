@@ -63,6 +63,20 @@ func (f *FontDisplay) DisplayBasic(r types.Readings) {
 	f.font.PrintText(formatString)
 }
 
+func (f *FontDisplay) DisplayError() {
+	if f == nil {
+		return
+	}
+	f.clear()
+	
+	f.font.Configure(font.Config{FontType: font.FONT_9x15})
+	f.font.XPos = 0
+	f.font.YPos = 0
+	f.font.PrintText("SENSOR ERROR")
+	f.font.YPos = 15
+	f.font.PrintText("CHECK SYSTEM")
+}
+
 func (f *FontDisplay) DisplayFull(r types.Readings) {
 	if f == nil {
 		return
