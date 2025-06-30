@@ -1,12 +1,11 @@
-package main
+package airquality
 
 import (
 	"fmt"
 
 	"machine"
-	"tinygo.org/x/drivers/aht20"
-
 	"pico_co2/pkg/ens160"
+	"tinygo.org/x/drivers/aht20"
 )
 
 // ENS160AHT20Adapter adapts the combination of an ENS160 and AHT20 sensor

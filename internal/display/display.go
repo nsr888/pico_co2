@@ -1,8 +1,9 @@
-package main
+package display
 
 import (
 	"fmt"
 	"log"
+	"pico_co2/internal/types"
 
 	font "github.com/Nondzu/ssd1306_font"
 	"machine"
@@ -43,7 +44,7 @@ type FontDisplay struct {
 	clear func()
 }
 
-func (f *FontDisplay) DisplayBasic(r Readings) {
+func (f *FontDisplay) DisplayBasic(r types.Readings) {
 	if f == nil {
 		return
 	}
@@ -62,7 +63,7 @@ func (f *FontDisplay) DisplayBasic(r Readings) {
 	f.font.PrintText(formatString)
 }
 
-func (f *FontDisplay) DisplayFull(r Readings) {
+func (f *FontDisplay) DisplayFull(r types.Readings) {
 	if f == nil {
 		return
 	}

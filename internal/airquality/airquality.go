@@ -1,4 +1,4 @@
-package main
+package airquality
 
 // AirQualitySensor defines the standard interface for a sensor module that
 // provides environmental readings.

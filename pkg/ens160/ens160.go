@@ -4,20 +4,6 @@ Sensor manufactured by ScioSense.
 
 Datasheet: https://www.sciosense.com/wp-content/uploads/2023/12/ENS160-Datasheet.pdf
 
-Example of usage:
-
-	device := ens160.New(machine.I2C1, ens160.DefaultAddress)
-	if err := device.Configure(); err != nil {
-		log.Fatal(err)
-	}
-
-	for {
-		if err := device.Read(ens160.WithWaitForNew(), ens160.WithValidityCheck()); err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("eCO2: %d, TVOC: %d, AQI: %d\n", device.LastCO2(), device.LastTVOC(), device.LastAQI())
-		time.Sleep(5 * time.Second)
-	}
 */
 package ens160
 
