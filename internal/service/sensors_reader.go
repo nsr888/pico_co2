@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -11,10 +10,7 @@ import (
 	"pico_co2/internal/airquality"
 	"pico_co2/internal/display"
 	"pico_co2/internal/types"
-	"pico_co2/pkg/ens160"
 )
-
-var ErrAirQualityReadError = errors.New("air quality sensor read error")
 
 type SensorReader struct {
 	airSensor airquality.AirQualitySensor
@@ -34,36 +30,37 @@ func NewSensorReader(
 	}
 }
 
-func (sr *SensorReader) Read() (types.Readings, error) {
-	var r types.Readings
-
-	dt, err := sr.ds3231.ReadTime()
+func (sr *SensorReader) ProcessSensorReadings() {
+	readings, err := sr.ReadAll()
 	if err != nil {
-		log.Printf("Error reading time: %v", err)
-	}
-	r.Timestamp = dt
-
-	if err := sr.airSensor.Read(); err != nil {
-		return r, fmt.Errorf("%w: %v", ErrAirQualityReadError, err)
+		log.Println("Error reading sensor data:", err)
+		sr.display.DisplayError(err.Error())
+		return
 	}
 
-	r.Temperature = sr.airSensor.Temperature()
-	r.Humidity = sr.airSensor.Humidity()
-	r.CO2 = sr.airSensor.CO2()
-	r.Status = ens160.CO2String(sr.airSensor.CO2())
+	logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
+	logger.Println("Sensor readings:", readings)
 
-	return r, nil
+	sr.display.DisplayReadings(readings)
 }
 
-func (sr *SensorReader) ProcessSensorReadings() {
-	readings, err := sr.Read()
-	logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
-	logger.Printf("Readings: %+v", readings)
-	
+func (sr *SensorReader) ReadAll() (*types.Readings, error) {
+	dt, err := sr.ds3231.ReadTime()
 	if err != nil {
-		logger.Println(err)
-		sr.display.DisplayError()
-	} else {
-		sr.display.DisplayFull(readings)
+		return nil, fmt.Errorf("failed to read DS3231 time: %w", err)
 	}
+
+	airReadings, err := sr.airSensor.Read()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read air quality sensor: %w", err)
+	}
+
+	return &types.Readings{
+		Timestamp:   dt,
+		Temperature: airReadings.Temperature,
+		Humidity:    airReadings.Humidity,
+		CO2:         airReadings.CO2,
+		Status:      airReadings.Interpretation(),
+		Description: airReadings.Quality.Description,
+	}, nil
 }

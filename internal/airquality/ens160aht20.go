@@ -1,11 +1,19 @@
 package airquality
 
 import (
+	"errors"
 	"fmt"
 
 	"machine"
-	"pico_co2/pkg/ens160"
 	"tinygo.org/x/drivers/aht20"
+
+	"pico_co2/internal/types"
+	"pico_co2/pkg/ens160"
+)
+
+const (
+	StatusStartUp   = "Start up"
+	StatusWarmingUp = "Warming up"
 )
 
 // ENS160AHT20Adapter adapts the combination of an ENS160 and AHT20 sensor
@@ -13,8 +21,7 @@ import (
 type ENS160AHT20Adapter struct {
 	aht20    *aht20.Device
 	ens160   *ens160.Device
-	lastTemp float32
-	lastHum  float32
+	readings *types.Readings
 }
 
 // Verify that ENS160AHT20Adapter implements the AirQualitySensor interface.
@@ -42,40 +49,57 @@ func (a *ENS160AHT20Adapter) Configure() error {
 
 // Read performs a sequential read: first the AHT20 to get temperature and
 // humidity, then the ENS160 using those values for compensation.
-func (a *ENS160AHT20Adapter) Read() error {
-	if err := a.aht20.Read(); err != nil {
-		return fmt.Errorf("failed to read from AHT20: %w", err)
-	}
-	a.lastTemp = a.aht20.Celsius()
-	a.lastHum = a.aht20.RelHumidity()
+func (a *ENS160AHT20Adapter) Read() (*Readings, error) {
+	var r Readings
 
-	if err := a.ens160.SetEnvData(a.lastTemp, a.lastHum); err != nil {
-		return fmt.Errorf("failed to set env data for ENS160: %w", err)
+	if err := a.aht20.Read(); err != nil {
+		return nil, fmt.Errorf("read from AHT20: %w", err)
 	}
-	return a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
+	r.Temperature = a.Temperature()
+	r.Humidity = a.Humidity()
+
+	if err := a.ens160.SetEnvData(
+		r.Temperature,
+		r.Humidity,
+	); err != nil {
+		return &r, fmt.Errorf("set env data for ENS160: %w", err)
+	}
+
+	err := a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
+	switch {
+	case errors.Is(err, ens160.ErrInitialStartUpPhase) ||
+		errors.Is(err, ens160.ErrWarmUpPhase):
+		r.CO2 = a.CO2()
+		r.CO2Interpretation = ens160.CO2String(r.CO2)
+		r.Quality.Status = StatusNotValid
+		r.Quality.Description = fmt.Sprintf("read ENS160: %s", err.Error())
+
+		return &r, nil
+	case err != nil:
+		r.Quality.Status = StatusNotValid
+		r.Quality.Description = fmt.Sprintf("read ENS160: %s", err.Error())
+
+		return &r, fmt.Errorf("read ENS160: %w", err)
+	}
+
+	r.CO2 = a.CO2()
+	r.CO2Interpretation = ens160.CO2String(r.CO2)
+	r.Quality.Status = StatusOK
+
+	return &r, nil
 }
 
 // Temperature returns the last measured temperature.
 func (a *ENS160AHT20Adapter) Temperature() float32 {
-	return a.lastTemp
+	return a.aht20.Celsius()
 }
 
 // Humidity returns the last measured humidity.
 func (a *ENS160AHT20Adapter) Humidity() float32 {
-	return a.lastHum
+	return a.aht20.RelHumidity()
 }
 
 // CO2 returns the last measured eCO2 value.
 func (a *ENS160AHT20Adapter) CO2() uint16 {
 	return a.ens160.LastCO2()
-}
-
-// TVOC returns the last measured TVOC value.
-func (a *ENS160AHT20Adapter) TVOC() uint16 {
-	return a.ens160.LastTVOC()
-}
-
-// AQI returns the last measured AQI value.
-func (a *ENS160AHT20Adapter) AQI() uint8 {
-	return a.ens160.LastAQI()
 }
