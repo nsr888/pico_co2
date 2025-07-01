@@ -33,26 +33,33 @@ func NewSensorReader(
 func (sr *SensorReader) ProcessSensorReadings() {
 	readings, err := sr.ReadAll()
 	if err != nil {
-		log.Println("Error reading sensor data:", err)
-		sr.display.DisplayError(err.Error())
+		log.Println("Critical sensor error:", err)
+		sr.display.DisplayError(fmt.Sprintf("Fatal: %v", err))
 		return
 	}
 
 	logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
 	logger.Println("Sensor readings:", readings)
 
-	sr.display.DisplayReadings(readings)
+	// Show detailed descriptions when status is not OK
+	if readings.Description != "" {
+		sr.display.DisplayError(readings.Description)
+	} else {
+		sr.display.DisplayReadings(readings)
+	}
 }
 
 func (sr *SensorReader) ReadAll() (*types.Readings, error) {
+	// Collect RTC time first
 	dt, err := sr.ds3231.ReadTime()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read DS3231 time: %w", err)
+		return nil, fmt.Errorf("RTC error: %w", err)
 	}
 
+	// Collect air quality sensor data
 	airReadings, err := sr.airSensor.Read()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read air quality sensor: %w", err)
+		return nil, fmt.Errorf("air sensor error: %w", err)
 	}
 
 	return &types.Readings{

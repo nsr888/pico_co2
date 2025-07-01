@@ -30,14 +30,20 @@ func (r Readings) Interpretation() string {
 type QualityStatus string
 
 const (
-	StatusOK       QualityStatus = "ok"
-	StatusNotValid QualityStatus = "not_valid"
+	StatusOK        QualityStatus = "ok"
+	StatusWarmUp    QualityStatus = "warming_up"
+	StatusStartUp   QualityStatus = "start_up"
+	StatusNotValid  QualityStatus = "not_valid"
 )
 
 func (qs QualityStatus) String() string {
 	switch qs {
 	case StatusOK:
 		return "OK"
+	case StatusWarmUp:
+		return "Warming up"
+	case StatusStartUp:
+		return "Start up"
 	case StatusNotValid:
 		return "Not Valid"
 	default:

@@ -50,43 +50,58 @@ func (a *ENS160AHT20Adapter) Configure() error {
 // Read performs a sequential read: first the AHT20 to get temperature and
 // humidity, then the ENS160 using those values for compensation.
 func (a *ENS160AHT20Adapter) Read() (*Readings, error) {
-	var r Readings
+	r := &Readings{
+		Quality: DataQuality{Status: StatusOK},
+	}
 
+	// Temp/humidity reading (AHT20)
 	if err := a.aht20.Read(); err != nil {
-		return nil, fmt.Errorf("read from AHT20: %w", err)
+		r.Quality = DataQuality{
+			Status:      StatusNotValid,
+			Description: "Temp/humidity sensor: " + err.Error(),
+		}
+		return r, nil
 	}
 	r.Temperature = a.Temperature()
 	r.Humidity = a.Humidity()
 
-	if err := a.ens160.SetEnvData(
-		r.Temperature,
-		r.Humidity,
-	); err != nil {
-		return &r, fmt.Errorf("set env data for ENS160: %w", err)
+	// Environmental compensation (ENS160)
+	if err := a.ens160.SetEnvData(r.Temperature, r.Humidity); err != nil {
+		r.Quality = DataQuality{
+			Status:      StatusNotValid,
+			Description: "Env compensation: " + err.Error(),
+		}
+		return r, nil
 	}
 
-	err := a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
+	// Sensor reading (ENS160)
+	sensorErr := a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
 	switch {
-	case errors.Is(err, ens160.ErrInitialStartUpPhase) ||
-		errors.Is(err, ens160.ErrWarmUpPhase):
-		r.CO2 = a.CO2()
-		r.CO2Interpretation = ens160.CO2String(r.CO2)
-		r.Quality.Status = StatusNotValid
-		r.Quality.Description = fmt.Sprintf("read ENS160: %s", err.Error())
-
-		return &r, nil
-	case err != nil:
-		r.Quality.Status = StatusNotValid
-		r.Quality.Description = fmt.Sprintf("read ENS160: %s", err.Error())
-
-		return &r, fmt.Errorf("read ENS160: %w", err)
+	case errors.Is(sensorErr, ens160.ErrInitialStartUpPhase):
+		r.Quality = DataQuality{
+			Status:      StatusStartUp,
+			Description: "Normal initialization: " + sensorErr.Error(),
+		}
+	case errors.Is(sensorErr, ens160.ErrWarmUpPhase):
+		r.Quality = DataQuality{
+			Status:      StatusWarmUp,
+			Description: "Normal warm-up: " + sensorErr.Error(),
+		}
+	case errors.Is(sensorErr, ens160.ErrNoValidOutput):
+		r.Quality = DataQuality{
+			Status:      StatusNotValid,
+			Description: "Invalid readings: " + sensorErr.Error(),
+		}
+	case sensorErr != nil:
+		r.Quality = DataQuality{
+			Status:      StatusNotValid,
+			Description: "Unexpected error: " + sensorErr.Error(),
+		}
 	}
 
 	r.CO2 = a.CO2()
 	r.CO2Interpretation = ens160.CO2String(r.CO2)
-	r.Quality.Status = StatusOK
-
-	return &r, nil
+	return r, nil
 }
 
 // Temperature returns the last measured temperature.

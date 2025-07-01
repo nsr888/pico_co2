@@ -67,37 +67,23 @@ func (f *FontDisplay) DisplayBasic(r *types.Readings) {
 }
 
 func (f *FontDisplay) DisplayError(msg string) {
-	if f == nil {
+	if f == nil || msg == "" {
 		return
 	}
+	
+	// Split longer messages into multiple lines
+	lines := []string{msg}
+	if len(msg) > 21 {
+		lines = splitStringToLines(msg, 21)
+	}
+	
 	f.clear()
 	f.font.Configure(font.Config{FontType: font.FONT_6x8})
-
-	var (
-		maxLines       = 4
-		maxCharPerLine = displayWidth / 6
-	)
-
-	if len(msg) < maxCharPerLine {
-		f.font.XPos = 0
-		f.font.YPos = 0
-		f.font.PrintText(msg)
-
-		return
-	}
-
-	msg = strings.ReplaceAll(msg, "\n", " ")
-
-	log.Println("splitting error message into lines")
-
-	lines := splitStringToLines(msg, maxCharPerLine)
-	if len(lines) > maxLines {
-		lines = lines[:maxLines]
-	}
-
-	log.Printf("Displaying error message with %d lines", len(lines))
+	
 	for i, line := range lines {
-		log.Printf("Display error, line %d: %s", i, line)
+		if i > 3 { // Max 4 lines on a 32px display
+			break
+		}
 		f.font.XPos = 0
 		f.font.YPos = int16(i * 8)
 		f.font.PrintText(line)
