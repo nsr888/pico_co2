@@ -57,12 +57,17 @@ func main() {
 		humidity := aht21Sensor.RelHumidity()
 
 		// Set environmental compensation data for ENS160
-		if err := ens160Sensor.SetEnvData(temperature, humidity); err != nil {
+		tempMilliC := int32(temperature * 1000)
+		humidityMilliPct := int32(humidity * 1000)
+		if err := ens160Sensor.SetEnvData(tempMilliC, humidityMilliPct); err != nil {
 			fmt.Printf("Error setting environmental data: %v\n", err)
 		}
 
 		// Read air quality data
-		err := ens160Sensor.Read()
+		err := ens160Sensor.Read(ens160.ReadConfig{
+			WaitForNew:        true,
+			WithValidityCheck: true,
+		})
 		if err != nil {
 			fmt.Printf("Error reading ENS160: %v\n", err)
 			time.Sleep(5 * time.Second)

@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"machine"
 )
 
 // ErrInitialStartUpPhase indicates the device is in its initial startup phase.
@@ -28,17 +26,16 @@ var ErrWarmUpPhase = errors.New("warmup in progress")
 // ErrNoValidOutput indicates sensor signals are out of range or invalid.
 var ErrNoValidOutput = errors.New("no valid output")
 
-// Device wraps an I2C connection to an ENS160 device.
 type Device struct {
-	bus      *machine.I2C
+	bus      I2C
 	address  uint8
+	buf      [4]byte
 	lastCO2  uint16
 	lastTVOC uint16
 	lastAQI  uint8
 }
 
-// New creates a new ENS160 device with the given I2C bus and address.
-func New(bus *machine.I2C, address uint8) *Device {
+func New(bus I2C, address uint8) *Device {
 	if address == 0 {
 		address = DefaultAddress
 	}
@@ -48,8 +45,6 @@ func New(bus *machine.I2C, address uint8) *Device {
 	}
 }
 
-// Configure sets up the sensor by resetting it and putting it into standard
-// mode. Should be called once after New.
 func (d *Device) Configure() error {
 	if err := d.Reset(); err != nil {
 		return err
@@ -57,15 +52,12 @@ func (d *Device) Configure() error {
 	return d.SetOperatingMode(ModeStandard)
 }
 
-// GetOperatingMode reads the current operating mode of the device.
 func (d *Device) GetOperatingMode() (uint8, error) {
-	data := []uint8{0}
-	err := d.bus.ReadRegister(d.address, regOperatingMode, data)
-
-	return data[0], err
+	buf := d.buf[:1]
+	err := d.bus.ReadRegister(d.address, regOperatingMode, buf)
+	return buf[0], err
 }
 
-// SetOperatingMode sets the device's operating mode.
 func (d *Device) SetOperatingMode(mode uint8) error {
 	if mode != ModeDeepSleep &&
 		mode != ModeIdle &&
@@ -73,19 +65,17 @@ func (d *Device) SetOperatingMode(mode uint8) error {
 		mode != ModeReset {
 		return errors.New("invalid operating mode")
 	}
-
-	return d.bus.WriteRegister(d.address, regOperatingMode, []uint8{mode})
+	d.buf[0] = mode
+	return d.bus.WriteRegister(d.address, regOperatingMode, d.buf[:1])
 }
 
-// GetRawCO2 reads the calculated equivalent CO2 concentration in PPM.
 func (d *Device) GetRawCO2() (uint16, error) {
-	data := []uint8{0, 0}
-	err := d.bus.ReadRegister(d.address, regECO2, data)
+	buf := d.buf[:2]
+	err := d.bus.ReadRegister(d.address, regECO2, buf)
 	if err != nil {
 		return 0, err
 	}
-
-	return uint16(data[0]) | uint16(data[1])<<8, nil
+	return uint16(buf[0]) | uint16(buf[1])<<8, nil
 }
 
 func CO2String(value uint16) string {
@@ -108,21 +98,19 @@ func CO2String(value uint16) string {
 // GetRawTVOC reads the calculated Total Volatile Organic Compounds
 // concentration in ppb.
 func (d *Device) GetRawTVOC() (uint16, error) {
-	data := []uint8{0, 0}
-	err := d.bus.ReadRegister(d.address, regTVOC, data)
+	buf := d.buf[:2]
+	err := d.bus.ReadRegister(d.address, regTVOC, buf)
 	if err != nil {
 		return 0, err
 	}
-
-	return uint16(data[0]) | uint16(data[1])<<8, nil
+	return uint16(buf[0]) | uint16(buf[1])<<8, nil
 }
 
 // GetRawAQI reads the calculated Air Quality Index (1-5).
 func (d *Device) GetRawAQI() (uint8, error) {
-	data := []uint8{0}
-	err := d.bus.ReadRegister(d.address, regAQI, data)
-
-	return data[0], err
+	buf := d.buf[:1]
+	err := d.bus.ReadRegister(d.address, regAQI, buf)
+	return buf[0], err
 }
 
 func AQIString(value uint8) string {
@@ -157,18 +145,20 @@ func (d *Device) Reset() error {
 	time.Sleep(250 * time.Millisecond)
 
 	// 3) Clear any old GPR data
+	d.buf[0] = CommandNop
 	if err := d.bus.WriteRegister(
 		d.address,
 		regCommand,
-		[]uint8{CommandNop},
+		d.buf[:1],
 	); err != nil {
 		return err
 	}
 	time.Sleep(150 * time.Millisecond)
+	d.buf[0] = CommandClrGpr
 	if err := d.bus.WriteRegister(
 		d.address,
 		regCommand,
-		[]uint8{CommandClrGpr},
+		d.buf[:1],
 	); err != nil {
 		return err
 	}
@@ -178,34 +168,33 @@ func (d *Device) Reset() error {
 }
 
 // SetEnvData sets the temperature and humidity data for improved accuracy.
-// temperature is in Celsius, humidity is in percentage.
-func (d *Device) SetEnvData(temperature float32, humidity float32) error {
-	// Convert temperature to Kelvin * 64
-	tempRaw := uint16((temperature + 273.15) * 64)
-	// Convert humidity to percentage * 512
-	humRaw := uint16(humidity * 512)
+// tempMilliC is temperature in milli-Celsius, humidityMilliPct is humidity in milli-percent (e.g. 45670 = 45.67%).
+func (d *Device) SetEnvData(tempMilliC int32, humidityMilliPct int32) error {
+	// Convert temperature to Kelvin * 64, using integer math:
+	// tempKelvin = tempMilliC/1000 + 273.15
+	// tempRaw = (tempKelvin * 64)
+	//         = ((tempMilliC + 273150) * 64) / 1000
+	tempRaw := uint16(((tempMilliC + 273150) * 64) / 1000)
+	// Convert humidity to percentage * 512, using integer math:
+	// humRaw = (humidityMilliPct * 512) / 1000
+	humRaw := uint16((humidityMilliPct * 512) / 1000)
 
-	tempLSB := byte(tempRaw & 0xFF)
-	tempMSB := byte(tempRaw >> 8)
-	humLSB := byte(humRaw & 0xFF)
-	humMSB := byte(humRaw >> 8)
+	d.buf[0] = byte(tempRaw & 0xFF)
+	d.buf[1] = byte(tempRaw >> 8)
+	d.buf[2] = byte(humRaw & 0xFF)
+	d.buf[3] = byte(humRaw >> 8)
 
-	// write 2 bytes temp @ 0x13, then 2 bytes humidity @ 0x15
-	return d.bus.WriteRegister(d.address, regTempIn, []byte{
-		tempLSB, tempMSB,
-		humLSB, humMSB,
-	})
+	return d.bus.WriteRegister(d.address, regTempIn, d.buf[:4])
 }
 
 // ReadStatus reads the status register of the ENS160.
 func (d *Device) ReadStatus() (byte, error) {
-	data := []byte{0}
-	err := d.bus.ReadRegister(d.address, regStatus, data)
+	buf := d.buf[:1]
+	err := d.bus.ReadRegister(d.address, regStatus, buf)
 	if err != nil {
 		return 0, err
 	}
-
-	return data[0], nil
+	return buf[0], nil
 }
 
 /**
@@ -242,9 +231,7 @@ func (d *Device) ReadGPRDrdy() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	gprDrdy := (status & DataStatusNewGpr) != 0 // Extract bit 0
-
 	return gprDrdy, nil
 }
 
@@ -254,9 +241,7 @@ func (d *Device) ReadDataDrdy() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	dataDrdy := (status & DataStatusNewDat) != 0 // Extract bit 1
-
 	return dataDrdy, nil
 }
 
@@ -294,9 +279,7 @@ func (d *Device) ReadStater() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	stater := (status & DataStatusStater) != 0 // Extract bit 6
-
 	return stater, nil
 }
 
@@ -306,9 +289,7 @@ func (d *Device) ReadStatas() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	statusFlag := (status & DataStatusStatas) != 0 // Extract bit 7
-
 	return statusFlag, nil
 }
 
@@ -349,41 +330,14 @@ func (d *Device) ReadStatusText() (string, error) {
 		ValidityFlagToString(validityFlag), stater, statusFlag), nil
 }
 
-// ReadOptions holds configuration for the Read operation
-type ReadOptions struct {
-	waitForNew        bool
-	withValidityCheck bool
-}
-
-// ReadOption is a function that configures ReadOptions
-type ReadOption func(*ReadOptions)
-
-// WithWaitForNew configures the Read operation to wait for new data
-func WithWaitForNew() ReadOption {
-	return func(o *ReadOptions) {
-		o.waitForNew = true
-	}
-}
-
-// WithValidityCheck configures the Read operation to check data validity
-func WithValidityCheck() ReadOption {
-	return func(o *ReadOptions) {
-		o.withValidityCheck = true
-	}
+// ReadConfig holds configuration for the Read operation
+type ReadConfig struct {
+	WaitForNew        bool
+	WithValidityCheck bool
 }
 
 // Read reads the sensor status and updates all sensor values.
-// It accepts optional ReadOption parameters to configure the operation.
-func (d *Device) Read(opts ...ReadOption) error {
-	options := &ReadOptions{
-		waitForNew:        false,
-		withValidityCheck: false,
-	}
-
-	for _, opt := range opts {
-		opt(options)
-	}
-
+func (d *Device) Read(cfg ReadConfig) error {
 	status, err := d.ReadStatus()
 	if err != nil {
 		return fmt.Errorf("error reading status register: %w", err)
@@ -398,8 +352,9 @@ func (d *Device) Read(opts ...ReadOption) error {
 		return fmt.Errorf("fatal sensor error (stater flag)")
 	}
 
-	if options.waitForNew {
-		for !dataReady {
+	if cfg.WaitForNew {
+		retries := 500 // ~500ms timeout
+		for !dataReady && retries > 0 {
 			time.Sleep(time.Millisecond)
 			status, err = d.ReadStatus()
 			if err != nil {
@@ -412,6 +367,10 @@ func (d *Device) Read(opts ...ReadOption) error {
 			if stater {
 				return fmt.Errorf("fatal sensor error during wait (stater flag)")
 			}
+			retries--
+		}
+		if retries == 0 {
+			return errors.New("timeout waiting for new data")
 		}
 	}
 
@@ -434,7 +393,7 @@ func (d *Device) Read(opts ...ReadOption) error {
 	d.lastTVOC = tvoc
 	d.lastAQI = aqi
 
-	if options.withValidityCheck {
+	if cfg.WithValidityCheck {
 		switch validityFlag {
 		case ValidityInitialStartUpPhase:
 			return fmt.Errorf(

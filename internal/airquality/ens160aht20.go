@@ -55,12 +55,19 @@ func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
 		Humidity:    a.aht20.RelHumidity(),
 	}
 
+	// Convert to integer representation for ENS160
+	tempMilliC := int32(r.Temperature * 1000)
+	humidityMilliPct := int32(r.Humidity * 1000)
+
 	// Environmental compensation (ENS160)
-	if err := a.ens160.SetEnvData(r.Temperature, r.Humidity); err != nil {
+	if err := a.ens160.SetEnvData(tempMilliC, humidityMilliPct); err != nil {
 		return r, fmt.Errorf("failed to set environment data for ENS160: %w", err)
 	}
 
-	if err := a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew()); err != nil {
+	if err := a.ens160.Read(ens160.ReadConfig{
+		WaitForNew:        true,
+		WithValidityCheck: true,
+	}); err != nil {
 		r.Description = err.Error()
 		if errors.Is(err, ens160.ErrInitialStartUpPhase) || errors.Is(err, ens160.ErrWarmUpPhase) {
 			r.CO2 = a.ens160.LastCO2()
