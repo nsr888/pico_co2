@@ -3,13 +3,14 @@ package app
 import (
 	"fmt"
 	"log"
+	"time"
+
 	"machine"
+	"tinygo.org/x/drivers/ds3231"
+
 	"pico_co2/internal/airquality"
 	"pico_co2/internal/display"
 	"pico_co2/internal/service"
-	"time"
-
-	"tinygo.org/x/drivers/ds3231"
 )
 
 // Application Logic
@@ -23,19 +24,26 @@ type App struct {
 	sensorReader *service.SensorReader
 }
 
-func New(i2cFrequency uint32, sda machine.Pin, scl machine.Pin) (*App, error) {
+type Config struct {
+	I2cFrequency    uint32
+	I2cSDA          machine.Pin
+	I2cSCL          machine.Pin
+	IsAdvancedSetup bool
+}
+
+func New(cfg Config) (*App, error) {
 	led := machine.LED
 	led.Configure(machine.PinConfig{Mode: machine.PinOutput})
 
 	if err := machine.I2C0.Configure(machine.I2CConfig{
-		Frequency: i2cFrequency,
-		SDA:       sda,
-		SCL:       scl,
+		Frequency: cfg.I2cFrequency,
+		SDA:       cfg.I2cSDA,
+		SCL:       cfg.I2cSCL,
 	}); err != nil {
 		return nil, err
 	}
 
-	d, err := display.NewFontDisplay(machine.I2C0)
+	fontDisplay, err := display.NewFontDisplay(machine.I2C0)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +58,16 @@ func New(i2cFrequency uint32, sda machine.Pin, scl machine.Pin) (*App, error) {
 		return nil, fmt.Errorf("failed to configure DS3231 sensor")
 	}
 
-	sensorReader := service.NewSensorReader(airQualitySensor, &ds3231Sensor, d)
+	opts := []service.SensorReaderOption{}
+	if cfg.IsAdvancedSetup {
+		opts = append(opts, service.WithDS3231(&ds3231Sensor))
+	}
+
+	sensorReader := service.NewSensorReader(
+		airQualitySensor,
+		fontDisplay,
+		opts...,
+	)
 
 	return &App{
 		led:          led,

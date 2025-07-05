@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+
 	"machine"
+
 	"pico_co2/internal/app"
 )
 
@@ -15,7 +17,14 @@ const (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	application, err := app.New(i2cFrequency, i2cSDA, i2cSCL)
+	config := app.Config{
+		I2cFrequency:    i2cFrequency,
+		I2cSDA:          i2cSDA,
+		I2cSCL:          i2cSCL,
+		IsAdvancedSetup: false,
+	}
+
+	application, err := app.New(config)
 	if err != nil {
 		log.Fatalf("application setup failed: %v", err)
 	}

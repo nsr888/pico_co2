@@ -18,3 +18,7 @@ version:
 	tinygo-edit --version
 install_tinygo_edit:
 	go install github.com/sago35/tinygo-edit@latest
+flash_example_pico:
+	tinygo flash -target=pico -monitor ./pkg/ens160/example/
+build_example_pico:
+	tinygo build -target=pico -o main.uf2 ./pkg/ens160/example/

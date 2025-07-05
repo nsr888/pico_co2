@@ -1,6 +1,6 @@
 // Package ens160 provides a driver for the ScioSense ENS160 digital gas sensor.
 //
-// Datasheet: https://www.sciosense.com/products/environmental-sensors/ens16x-digital-metal-oxide-multi-gas-sensor-family/
+// Datasheet: https://www.sciosense.com/wp-content/uploads/2023/12/ENS160-Datasheet.pdf
 package ens160
 
 import (
@@ -12,8 +12,10 @@ import (
 	"tinygo.org/x/drivers"
 )
 
-// ErrWaitValidData is returned when ENS160 data is not valid (warm-up or initial start-up).
-var ErrWaitValidData = errors.New("ENS160 data not valid: device in warm-up or initial start-up")
+var (
+	ErrInitialStartUpPhase = errors.New("ENS160: initial start-up phase (wait ≥1h for valid data)")
+	ErrWarmUpPhase         = errors.New("ENS160: warm-up phase (wait ≥3min for valid data)")
+)
 
 // Device wraps an I2C connection to an ENS160 device.
 type Device struct {
@@ -115,7 +117,7 @@ func (d *Device) Update(which drivers.Measurement) error {
 			return err
 		}
 		if status&statusSTATER != 0 {
-			return errors.New("ENS160 error (STATER set)")
+			return errors.New("ENS160: error (STATER set)")
 		}
 		validity = (status & statusValidityMask) >> statusValidityShift
 
@@ -142,12 +144,14 @@ func (d *Device) Update(which drivers.Measurement) error {
 	switch validity {
 	case ValidityNormalOperation:
 		return nil
-	case ValidityInitialStartUpPhase, ValidityWarmUpPhase:
-		return ErrWaitValidData
+	case ValidityInitialStartUpPhase:
+		return ErrInitialStartUpPhase
+	case ValidityWarmUpPhase:
+		return ErrWarmUpPhase
 	case ValidityInvalidOutput:
-		return errors.New("ENS160 invalid output")
+		return errors.New("ENS160: invalid output")
 	default:
-		return fmt.Errorf("ENS160 unknown validity state: 0x%x", validity)
+		return fmt.Errorf("ENS160: unknown validity state: 0x%x", validity)
 	}
 }
 

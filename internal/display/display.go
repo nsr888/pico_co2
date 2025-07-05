@@ -3,7 +3,6 @@ package display
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	font "github.com/Nondzu/ssd1306_font"
 	"machine"
@@ -42,9 +41,8 @@ func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
 }
 
 type FontDisplay struct {
-	font       *font.Display
-	clear      func()
-	waitsCount int
+	font  *font.Display
+	clear func()
 }
 
 func (f *FontDisplay) DisplayBasic(r *types.Readings) {
@@ -70,16 +68,16 @@ func (f *FontDisplay) DisplayError(msg string) {
 	if f == nil || msg == "" {
 		return
 	}
-	
+
 	// Split longer messages into multiple lines
 	lines := []string{msg}
 	if len(msg) > 21 {
 		lines = splitStringToLines(msg, 21)
 	}
-	
+
 	f.clear()
 	f.font.Configure(font.Config{FontType: font.FONT_6x8})
-	
+
 	for i, line := range lines {
 		if i > 3 { // Max 4 lines on a 32px display
 			break
@@ -104,7 +102,7 @@ func splitStringToLines(s string, maxCharPerLine int) []string {
 	return lines
 }
 
-func (f *FontDisplay) DisplayReadings(r *types.Readings) {
+func (f *FontDisplay) DisplayNumReadings(r *types.Readings) {
 	if f == nil {
 		return
 	}
@@ -129,8 +127,57 @@ func (f *FontDisplay) DisplayReadings(r *types.Readings) {
 	f.font.XPos = int16(128 - (len(tempTitleStr) * 6))
 	f.font.YPos = 24
 	f.font.PrintText(tempTitleStr)
-	f.font.XPos = int16(128-(len(r.Status)*6)) / 2
+	f.font.XPos = int16(128-(len(r.CO2String)*6)) / 2
 	f.font.YPos = 24
-	f.font.PrintText(r.Status)
-	f.waitsCount = 0
+	f.font.PrintText(r.CO2String)
+}
+
+func (f *FontDisplay) DisplayTextReadings(r *types.Readings) {
+	if f == nil {
+		return
+	}
+	f.clear()
+
+	// Display CO2 status string at the top right corner
+	f.font.Configure(font.Config{FontType: font.FONT_7x10})
+	status := r.CO2String
+	f.font.XPos = int16(128 - (len(status) * 7))
+	f.font.YPos = 0
+	f.font.PrintText(status)
+
+	// Bars for CO2 level
+	f.font.Configure(font.Config{FontType: font.FONT_11x18})
+	f.font.XPos = 0
+	f.font.YPos = 0
+	f.font.PrintText(printVerticalBar(r.CO2))
+
+	// Small font
+	f.font.Configure(font.Config{FontType: font.FONT_7x10})
+	isValidStr := ""
+	if !r.IsValid {
+		isValidStr = "*"
+	}
+	formatString := fmt.Sprintf("CO2 %d%s %.0fC %.0f%%", r.CO2, isValidStr, r.Temperature, r.Humidity)
+	f.font.XPos = 0
+	f.font.YPos = 24
+	f.font.PrintText(formatString)
+}
+
+func printVerticalBar(count uint16) string {
+	var result string
+	cnt := int(count)
+
+	cnt = cnt - 400 // Adjust count to start from 400
+
+	if cnt <= 0 {
+		return result
+	}
+
+	numBars := cnt / 100
+
+	for i := 0; i < numBars; i++ {
+		result += "|"
+	}
+
+	return result
 }

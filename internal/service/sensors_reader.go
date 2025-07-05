@@ -9,7 +9,6 @@ import (
 
 	"pico_co2/internal/airquality"
 	"pico_co2/internal/display"
-	"pico_co2/internal/types"
 )
 
 type SensorReader struct {
@@ -18,56 +17,51 @@ type SensorReader struct {
 	display   *display.FontDisplay
 }
 
+type SensorReaderOption func(*SensorReader)
+
+func WithDS3231(ds3231 *ds3231.Device) SensorReaderOption {
+	return func(sr *SensorReader) {
+		sr.ds3231 = ds3231
+	}
+}
+
 func NewSensorReader(
 	airSensor airquality.AirQualitySensor,
-	ds3231 *ds3231.Device,
 	display *display.FontDisplay,
+	sensorReaderOptions ...SensorReaderOption,
 ) *SensorReader {
-	return &SensorReader{
+	sr := &SensorReader{
 		airSensor: airSensor,
-		ds3231:    ds3231,
+		ds3231:    nil,
 		display:   display,
 	}
+	for _, opt := range sensorReaderOptions {
+		opt(sr)
+	}
+
+	return sr
 }
 
 func (sr *SensorReader) ProcessSensorReadings() {
-	readings, err := sr.ReadAll()
+	logger := log.New(log.Writer(), "SensorReader: ", log.LstdFlags)
+
+	readings, err := sr.airSensor.Read()
 	if err != nil {
-		log.Println("Critical sensor error:", err)
-		sr.display.DisplayError(fmt.Sprintf("Fatal: %v", err))
+		log.Println("Error reading air quality sensor:", err)
+		sr.display.DisplayError(fmt.Sprintf("air sensor: %s", err.Error()))
 		return
 	}
 
-	logger := log.New(log.Writer(), readings.Timestamp.Format(time.RFC3339)+" ", 0)
+	if sr.ds3231 != nil {
+		dt, err := sr.ds3231.ReadTime()
+		if err != nil {
+			log.Println("Error reading time from DS3231:", err)
+			sr.display.DisplayError(fmt.Sprintf("DS3231: %s", err.Error()))
+			return
+		}
+		logger = log.New(log.Writer(), dt.Format(time.RFC3339)+" ", 0)
+	}
+
 	logger.Println("Sensor readings:", readings)
-
-	// Show detailed descriptions when status is not OK
-	if readings.Description != "" {
-		sr.display.DisplayError(readings.Description)
-	} else {
-		sr.display.DisplayReadings(readings)
-	}
-}
-
-func (sr *SensorReader) ReadAll() (*types.Readings, error) {
-	// Collect RTC time first
-	dt, err := sr.ds3231.ReadTime()
-	if err != nil {
-		return nil, fmt.Errorf("RTC error: %w", err)
-	}
-
-	// Collect air quality sensor data
-	airReadings, err := sr.airSensor.Read()
-	if err != nil {
-		return nil, fmt.Errorf("air sensor error: %w", err)
-	}
-
-	return &types.Readings{
-		Timestamp:   dt,
-		Temperature: airReadings.Temperature,
-		Humidity:    airReadings.Humidity,
-		CO2:         airReadings.CO2,
-		Status:      airReadings.Interpretation(),
-		Description: airReadings.Quality.Description,
-	}, nil
+	sr.display.DisplayTextReadings(readings)
 }
