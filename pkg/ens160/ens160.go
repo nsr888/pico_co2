@@ -245,8 +245,7 @@ func (d *Device) ReadDataDrdy() (bool, error) {
 	return dataDrdy, nil
 }
 
-// ReadStatusText reads the status register and returns a human-readable
-// string.
+// ReadValidityFlag reads the status register and returns the validity flag.
 func (d *Device) ReadValidityFlag() (uint8, error) {
 	status, err := d.ReadStatus()
 	if err != nil {
@@ -254,7 +253,6 @@ func (d *Device) ReadValidityFlag() (uint8, error) {
 	}
 	// Extract bits 2 and 3
 	validityFlag := (status & DataStatusValidity) >> 2
-
 	return validityFlag, nil
 }
 
