@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrInitialStartUpPhase = errors.New("ENS160: initial start-up phase (wait ≥1h for valid data)")
-	ErrWarmUpPhase         = errors.New("ENS160: warm-up phase (wait ≥3min for valid data)")
+	ErrInitialStartUpPhase = errors.New("ENS160: initial start-up phase (wait min. 1h for valid data)")
+	ErrWarmUpPhase         = errors.New("ENS160: warm-up phase (wait min. 3min for valid data)")
 )
 
 // Device wraps an I2C connection to an ENS160 device.
