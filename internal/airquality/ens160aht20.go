@@ -1,10 +1,10 @@
 package airquality
 
 import (
-	"errors"
 	"fmt"
-
 	"machine"
+
+	"tinygo.org/x/drivers"
 	"tinygo.org/x/drivers/aht20"
 
 	"pico_co2/internal/types"
@@ -50,39 +50,47 @@ func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
 		return nil, fmt.Errorf("failed to read AHT20: %w", err)
 	}
 
-	r := &types.Readings{
-		Temperature: a.aht20.Celsius(),
-		Humidity:    a.aht20.RelHumidity(),
-	}
+	temp := a.aht20.Celsius()
+	hum := a.aht20.RelHumidity()
 
 	// Convert to integer representation for ENS160
-	tempMilliC := int32(r.Temperature * 1000)
-	humidityMilliPct := int32(r.Humidity * 1000)
+	tempMilliC := int32(temp * 1000)
+	humidityMilliPct := int32(hum * 1000)
 
 	// Environmental compensation (ENS160)
-	if err := a.ens160.SetEnvData(tempMilliC, humidityMilliPct); err != nil {
-		return r, fmt.Errorf("failed to set environment data for ENS160: %w", err)
+	if err := a.ens160.SetEnvDataMilli(tempMilliC, humidityMilliPct); err != nil {
+		return nil, fmt.Errorf("failed to set environment data for ENS160: %w", err)
 	}
 
-	if err := a.ens160.Read(ens160.ReadConfig{
-		WaitForNew:        true,
-		WithValidityCheck: true,
-	}); err != nil {
-		r.Description = err.Error()
-		if errors.Is(err, ens160.ErrInitialStartUpPhase) || errors.Is(err, ens160.ErrWarmUpPhase) {
-			r.CO2 = a.ens160.LastCO2()
-			r.CO2String = ens160.CO2String(r.CO2)
-			r.IsValid = false
-
-			return r, nil
-		}
-
-		return r, fmt.Errorf("failed to read ENS160: %w", err)
+	if err := a.ens160.Update(drivers.Concentration); err != nil {
+		return nil, fmt.Errorf("failed to read ENS160: %w", err)
 	}
 
-	r.IsValid = true
-	r.CO2 = a.ens160.LastCO2()
-	r.CO2String = ens160.CO2String(r.CO2)
+	co2 := a.ens160.ECO2()
+	r := &types.Readings{
+		Temperature: temp,
+		Humidity:    hum,
+		CO2:         co2,
+		CO2String:   CO2String(co2),
+		IsValid:     true,
+	}
 
 	return r, nil
+}
+
+func CO2String(value uint16) string {
+	switch {
+	case value < 400:
+		return "No data"
+	case value < 600:
+		return "Excellent"
+	case value < 800:
+		return "Good"
+	case value < 1000:
+		return "Fair"
+	case value < 1500:
+		return "Poor"
+	default:
+		return "Bad"
+	}
 }
