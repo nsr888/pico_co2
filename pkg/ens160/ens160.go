@@ -14,6 +14,7 @@ import (
 
 const (
 	defaultTimeout = 20 * time.Millisecond
+	shortTimeout   = 1 * time.Millisecond
 	longTimeout    = 1 * time.Second
 )
 
@@ -131,7 +132,7 @@ func (d *Device) Update(which drivers.Measurement) error {
 			gotData = true
 			break // Always break when data available
 		}
-		time.Sleep(time.Millisecond)
+		time.Sleep(shortTimeout)
 	}
 	if !gotData {
 		return errors.New("ENS160: timeout waiting for NEWDAT")
