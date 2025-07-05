@@ -11,11 +11,6 @@ import (
 	"pico_co2/pkg/ens160"
 )
 
-const (
-	StatusStartUp   = "Start up"
-	StatusWarmingUp = "Warming up"
-)
-
 // ENS160AHT20Adapter adapts the combination of an ENS160 and AHT20 sensor
 // to the AirQualitySensor interface.
 type ENS160AHT20Adapter struct {
@@ -40,6 +35,7 @@ func NewENS160AHT20Adapter(bus *machine.I2C) *ENS160AHT20Adapter {
 func (a *ENS160AHT20Adapter) Configure() error {
 	a.aht20.Reset()
 	a.aht20.Configure()
+
 	if err := a.ens160.Configure(); err != nil {
 		return fmt.Errorf("failed to configure ENS160: %w", err)
 	}
@@ -49,72 +45,37 @@ func (a *ENS160AHT20Adapter) Configure() error {
 
 // Read performs a sequential read: first the AHT20 to get temperature and
 // humidity, then the ENS160 using those values for compensation.
-func (a *ENS160AHT20Adapter) Read() (*Readings, error) {
-	r := &Readings{
-		Quality: DataQuality{Status: StatusOK},
+func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
+	if err := a.aht20.Read(); err != nil {
+		return nil, fmt.Errorf("failed to read AHT20: %w", err)
 	}
 
-	// Temp/humidity reading (AHT20)
-	if err := a.aht20.Read(); err != nil {
-		r.Quality = DataQuality{
-			Status:      StatusNotValid,
-			Description: "Temp/humidity sensor: " + err.Error(),
-		}
-		return r, nil
+	r := &types.Readings{
+		Temperature: a.aht20.Celsius(),
+		Humidity:    a.aht20.RelHumidity(),
 	}
-	r.Temperature = a.Temperature()
-	r.Humidity = a.Humidity()
 
 	// Environmental compensation (ENS160)
 	if err := a.ens160.SetEnvData(r.Temperature, r.Humidity); err != nil {
-		r.Quality = DataQuality{
-			Status:      StatusNotValid,
-			Description: "Env compensation: " + err.Error(),
-		}
-		return r, nil
+		return r, fmt.Errorf("failed to set environment data for ENS160: %w", err)
 	}
 
-	// Sensor reading (ENS160)
-	sensorErr := a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew())
-	switch {
-	case errors.Is(sensorErr, ens160.ErrInitialStartUpPhase):
-		r.Quality = DataQuality{
-			Status:      StatusStartUp,
-			Description: "Normal initialization: " + sensorErr.Error(),
+	if err := a.ens160.Read(ens160.WithValidityCheck(), ens160.WithWaitForNew()); err != nil {
+		r.Description = err.Error()
+		if errors.Is(err, ens160.ErrInitialStartUpPhase) || errors.Is(err, ens160.ErrWarmUpPhase) {
+			r.CO2 = a.ens160.LastCO2()
+			r.CO2String = ens160.CO2String(r.CO2)
+			r.IsValid = false
+
+			return r, nil
 		}
-	case errors.Is(sensorErr, ens160.ErrWarmUpPhase):
-		r.Quality = DataQuality{
-			Status:      StatusWarmUp,
-			Description: "Normal warm-up: " + sensorErr.Error(),
-		}
-	case errors.Is(sensorErr, ens160.ErrNoValidOutput):
-		r.Quality = DataQuality{
-			Status:      StatusNotValid,
-			Description: "Invalid readings: " + sensorErr.Error(),
-		}
-	case sensorErr != nil:
-		r.Quality = DataQuality{
-			Status:      StatusNotValid,
-			Description: "Unexpected error: " + sensorErr.Error(),
-		}
+
+		return r, fmt.Errorf("failed to read ENS160: %w", err)
 	}
 
-	r.CO2 = a.CO2()
-	r.CO2Interpretation = ens160.CO2String(r.CO2)
+	r.IsValid = true
+	r.CO2 = a.ens160.LastCO2()
+	r.CO2String = ens160.CO2String(r.CO2)
+
 	return r, nil
-}
-
-// Temperature returns the last measured temperature.
-func (a *ENS160AHT20Adapter) Temperature() float32 {
-	return a.aht20.Celsius()
-}
-
-// Humidity returns the last measured humidity.
-func (a *ENS160AHT20Adapter) Humidity() float32 {
-	return a.aht20.RelHumidity()
-}
-
-// CO2 returns the last measured eCO2 value.
-func (a *ENS160AHT20Adapter) CO2() uint16 {
-	return a.ens160.LastCO2()
 }

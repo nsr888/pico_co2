@@ -3,7 +3,6 @@ Package ens160 provides a driver for the ENS160 Digital Metal-Oxide Multi-Gas
 Sensor manufactured by ScioSense.
 
 Datasheet: https://www.sciosense.com/wp-content/uploads/2023/12/ENS160-Datasheet.pdf
-
 */
 package ens160
 
@@ -16,12 +15,14 @@ import (
 )
 
 // ErrInitialStartUpPhase indicates the device is in its initial startup phase.
-// The device requires 1 hour of continuous operation after first power-on.
-// After 24 hours of continuous operation, this status is stored in non-volatile memory.
-// If unpowered before 24 hours, the device will resume initial startup mode after re-powering.
+// The device requires 1 hour of continuous operation after initial start-up 
+// for adequate readings. After 24 hours of continuous operation, this status
+// is stored in non-volatile memory. If unpowered before 24 hours, the device 
+// will resume initial startup mode after re-powering.
 var ErrInitialStartUpPhase = errors.New("initial startup required")
 
-// ErrWarmUpPhase indicates readings are unavailable during the 3-minute warm-up period.
+// ErrWarmUpPhase indicates readings are unavailable during the 3-minute
+// warm-up period.
 var ErrWarmUpPhase = errors.New("warmup in progress")
 
 // ErrNoValidOutput indicates sensor signals are out of range or invalid.
@@ -47,8 +48,8 @@ func New(bus *machine.I2C, address uint8) *Device {
 	}
 }
 
-// Configure sets up the sensor by resetting it and putting it into standard mode.
-// Should be called once after New.
+// Configure sets up the sensor by resetting it and putting it into standard
+// mode. Should be called once after New.
 func (d *Device) Configure() error {
 	if err := d.Reset(); err != nil {
 		return err
@@ -156,11 +157,19 @@ func (d *Device) Reset() error {
 	time.Sleep(250 * time.Millisecond)
 
 	// 3) Clear any old GPR data
-	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{CommandNop}); err != nil {
+	if err := d.bus.WriteRegister(
+		d.address,
+		regCommand,
+		[]uint8{CommandNop},
+	); err != nil {
 		return err
 	}
 	time.Sleep(150 * time.Millisecond)
-	if err := d.bus.WriteRegister(d.address, regCommand, []uint8{CommandClrGpr}); err != nil {
+	if err := d.bus.WriteRegister(
+		d.address,
+		regCommand,
+		[]uint8{CommandClrGpr},
+	); err != nil {
 		return err
 	}
 	time.Sleep(350 * time.Millisecond)
@@ -331,11 +340,11 @@ func (d *Device) ReadStatusText() (string, error) {
 	}
 
 	return fmt.Sprintf(
-		"General purpose register data ready: %t, "+
-			"Measured data ready: %t, "+
-			"Validity: %s, "+
-			"Stater: %t, "+
-			"Statas: %t",
+		"general purpose register data ready: %t, "+
+			"measured data ready: %t, "+
+			"validity: %s, "+
+			"stater: %t, "+
+			"statas: %t",
 		gprDrdy, dataDrdy,
 		ValidityFlagToString(validityFlag), stater, statusFlag), nil
 }
@@ -377,7 +386,7 @@ func (d *Device) Read(opts ...ReadOption) error {
 
 	status, err := d.ReadStatus()
 	if err != nil {
-		return fmt.Errorf("error reading status register: %v", err)
+		return fmt.Errorf("error reading status register: %w", err)
 	}
 
 	validityFlag := (status & DataStatusValidity) >> 2
@@ -394,7 +403,7 @@ func (d *Device) Read(opts ...ReadOption) error {
 			time.Sleep(time.Millisecond)
 			status, err = d.ReadStatus()
 			if err != nil {
-				return fmt.Errorf("error reading status register: %v", err)
+				return fmt.Errorf("error reading status register: %w", err)
 			}
 			validityFlag = (status & DataStatusValidity) >> 2
 			stater = (status & DataStatusStater) != 0
@@ -406,35 +415,41 @@ func (d *Device) Read(opts ...ReadOption) error {
 		}
 	}
 
-	if options.withValidityCheck {
-		switch validityFlag {
-		case ValidityInitialStartUpPhase:
-			return ErrInitialStartUpPhase
-		case ValidityWarmUpPhase:
-			return ErrWarmUpPhase
-		case ValidityInvalidOutput:
-			return ErrNoValidOutput
-		}
-	}
-
 	co2, err := d.GetRawCO2()
 	if err != nil {
-		return fmt.Errorf("error reading eCO2 data register: %v", err)
+		return fmt.Errorf("error reading eCO2 data register: %w", err)
 	}
 
 	tvoc, err := d.GetRawTVOC()
 	if err != nil {
-		return fmt.Errorf("error reading TVOC data register: %v", err)
+		return fmt.Errorf("error reading TVOC data register: %w", err)
 	}
 
 	aqi, err := d.GetRawAQI()
 	if err != nil {
-		return fmt.Errorf("error reading AQI data register: %v", err)
+		return fmt.Errorf("error reading AQI data register: %w", err)
 	}
 
 	d.lastCO2 = co2
 	d.lastTVOC = tvoc
 	d.lastAQI = aqi
+
+	if options.withValidityCheck {
+		switch validityFlag {
+		case ValidityInitialStartUpPhase:
+			return fmt.Errorf(
+				"allow 60 minutes for adequate readings: %w",
+				ErrInitialStartUpPhase,
+			)
+		case ValidityWarmUpPhase:
+			return fmt.Errorf(
+				"allow 3 minutes for adequate readings: %w",
+				ErrWarmUpPhase,
+			)
+		case ValidityInvalidOutput:
+			return ErrNoValidOutput
+		}
+	}
 
 	return nil
 }
