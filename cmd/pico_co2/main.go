@@ -15,7 +15,7 @@ const (
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFlags(log.Lshortfile)
 
 	config := app.Config{
 		I2cFrequency:    i2cFrequency,
