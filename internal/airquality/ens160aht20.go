@@ -66,13 +66,26 @@ func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
 		return nil, fmt.Errorf("failed to read ENS160: %w", err)
 	}
 
+	// Check validity state from the ENS160 sensor
+	validity := a.ens160.Validity()
+	if validity != ens160.ValidityNormalOperation {
+		switch validity {
+		case ens160.ValidityInitialStartUpPhase:
+			log.Print("ENS160: initial start-up phase (wait min. 1h for valid data)")
+		case ens160.ValidityWarmUpPhase:
+			log.Print("ENS160: warm-up phase (wait min. 3min for valid data)")
+		case ens160.ValidityInvalidOutput:
+			log.Print("ENS160: invalid output detected")
+		}
+	}
+
 	co2 := a.ens160.ECO2()
 	r := &types.Readings{
 		Temperature: temp,
 		Humidity:    hum,
 		CO2:         co2,
 		CO2String:   CO2String(co2),
-		IsValid:     true,
+		IsValid:     validity == ens160.ValidityNormalOperation,
 	}
 
 	return r, nil

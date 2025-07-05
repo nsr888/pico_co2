@@ -12,11 +12,6 @@ import (
 	"tinygo.org/x/drivers"
 )
 
-var (
-	ErrInitialStartUpPhase = errors.New("ENS160: initial start-up phase (wait min. 1h for valid data)")
-	ErrWarmUpPhase         = errors.New("ENS160: warm-up phase (wait min. 3min for valid data)")
-)
-
 // Device wraps an I2C connection to an ENS160 device.
 type Device struct {
 	bus  drivers.I2C // I²C implementation
@@ -26,6 +21,7 @@ type Device struct {
 	tvocPPB uint16
 	eco2PPM uint16
 	aqiUBA  uint8
+	validity uint8   // Store the latest validity status
 
 	// pre‑allocated buffers (do **not** enlarge at runtime!)
 	wbuf [6]byte // longest write: reg + 4 bytes (TEMP+RH)
@@ -139,15 +135,16 @@ func (d *Device) Update(which drivers.Measurement) error {
 	d.aqiUBA = d.rbuf[0]
 	d.tvocPPB = binary.LittleEndian.Uint16(d.rbuf[1:3])
 	d.eco2PPM = binary.LittleEndian.Uint16(d.rbuf[3:5])
+	d.validity = validity  // Store the validity status
 
 	// Evaluate validity after data collection
 	switch validity {
 	case ValidityNormalOperation:
 		return nil
 	case ValidityInitialStartUpPhase:
-		return ErrInitialStartUpPhase
+		return nil
 	case ValidityWarmUpPhase:
-		return ErrWarmUpPhase
+		return nil
 	case ValidityInvalidOutput:
 		return errors.New("ENS160: invalid output")
 	default:
@@ -163,6 +160,13 @@ func (d *Device) ECO2() uint16 { return d.eco2PPM }
 
 // AQI returns the last Air‑Quality Index according to UBA (1–5).
 func (d *Device) AQI() uint8 { return d.aqiUBA }
+
+// Validity returns the current operating state of the sensor.
+// Returns one of: ValidityNormalOperation, ValidityWarmUpPhase, 
+// ValidityInitialStartUpPhase, or ValidityInvalidOutput.
+func (d *Device) Validity() uint8 {
+	return d.validity
+}
 
 // write1 writes a single byte to a register.
 func (d *Device) write1(reg, val uint8) error {
