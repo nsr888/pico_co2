@@ -6,10 +6,14 @@ package ens160
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
 	"tinygo.org/x/drivers"
 )
+
+// ErrWaitValidData is returned when ENS160 data is not valid (warm-up or initial start-up).
+var ErrWaitValidData = errors.New("ENS160 data not valid: device in warm-up or initial start-up")
 
 // Device wraps an I2C connection to an ENS160 device.
 type Device struct {
@@ -96,33 +100,36 @@ func (d *Device) Update(which drivers.Measurement) error {
 		return nil // nothing requested
 	}
 
-	// Poll DEVICE_STATUS until NEWDAT or timeout (~500 ms).
 	const maxTries = 500
+	var (
+		status   uint8
+		validity uint8
+	)
+	var gotData bool
+
+	// Poll DEVICE_STATUS until NEWDAT or timeout
 	for i := 0; i < maxTries; i++ {
-		status, err := d.read1(regStatus)
+		var err error
+		status, err = d.read1(regStatus)
 		if err != nil {
 			return err
 		}
 		if status&statusSTATER != 0 {
 			return errors.New("ENS160 error (STATER set)")
 		}
-		validity := (status & statusValidityMask) >> statusValidityShift
-		switch validity {
-		case ValidityInitialStartUpPhase:
-			return errors.New("ENS160 in 60‑min initial start‑up phase – readings not valid")
-		case ValidityWarmUpPhase:
-			return errors.New("ENS160 warming up – wait 3 min for valid readings")
-		case ValidityInvalidOutput:
-			return errors.New("ENS160 invalid output – check operating conditions")
-		}
+		validity = (status & statusValidityMask) >> statusValidityShift
 
 		if status&statusNEWDAT != 0 {
-			break // fresh data available
+			gotData = true
+			break // Always break when data available
 		}
 		time.Sleep(time.Millisecond)
 	}
+	if !gotData {
+		return errors.New("ENS160: timeout waiting for NEWDAT")
+	}
 
-	// Burst‑read AQI + TVOC + eCO₂ (5 bytes total).
+	// Burst-read data regardless of validity state
 	d.wbuf[0] = regAQI
 	if err := d.bus.Tx(d.addr, d.wbuf[:1], d.rbuf[:5]); err != nil {
 		return err
@@ -130,7 +137,18 @@ func (d *Device) Update(which drivers.Measurement) error {
 	d.aqiUBA = d.rbuf[0]
 	d.tvocPPB = binary.LittleEndian.Uint16(d.rbuf[1:3])
 	d.eco2PPM = binary.LittleEndian.Uint16(d.rbuf[3:5])
-	return nil
+
+	// Evaluate validity after data collection
+	switch validity {
+	case ValidityNormalOperation:
+		return nil
+	case ValidityInitialStartUpPhase, ValidityWarmUpPhase:
+		return ErrWaitValidData
+	case ValidityInvalidOutput:
+		return errors.New("ENS160 invalid output")
+	default:
+		return fmt.Errorf("ENS160 unknown validity state: 0x%x", validity)
+	}
 }
 
 // TVOC returns the last total‑VOC concentration in parts‑per‑billion.
