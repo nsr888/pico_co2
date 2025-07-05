@@ -12,16 +12,21 @@ import (
 	"tinygo.org/x/drivers"
 )
 
+const (
+	defaultTimeout = 20 * time.Millisecond
+	longTimeout    = 1 * time.Second
+)
+
 // Device wraps an I2C connection to an ENS160 device.
 type Device struct {
 	bus  drivers.I2C // I²C implementation
 	addr uint16      // 7‑bit bus address, promoted to uint16 per drivers.I2C
 
 	// shadow registers / last measurements
-	tvocPPB uint16
-	eco2PPM uint16
-	aqiUBA  uint8
-	validity uint8   // Store the latest validity status
+	tvocPPB  uint16
+	eco2PPM  uint16
+	aqiUBA   uint8
+	validity uint8 // Store the latest validity status
 
 	// pre‑allocated buffers (do **not** enlarge at runtime!)
 	wbuf [6]byte // longest write: reg + 4 bytes (TEMP+RH)
@@ -42,20 +47,25 @@ func (d *Device) Configure() error {
 	if err := d.write1(regOpMode, ModeReset); err != nil {
 		return err
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(defaultTimeout)
 
 	// 2. Enter IDLE, clear GPR registers, then go STANDARD.
 	if err := d.write1(regOpMode, ModeIdle); err != nil {
 		return err
 	}
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(defaultTimeout)
 
 	if err := d.write1(regCommand, cmdClrGPR); err != nil {
 		return err
 	}
-	time.Sleep(350 * time.Millisecond)
+	time.Sleep(defaultTimeout)
 
-	return d.write1(regOpMode, ModeStandard)
+	if err := d.write1(regOpMode, ModeStandard); err != nil {
+		return err
+	}
+	time.Sleep(longTimeout)
+
+	return nil
 }
 
 // SetEnvDataMilli sets the ambient temperature and humidity for compensation.
@@ -98,7 +108,7 @@ func (d *Device) Update(which drivers.Measurement) error {
 		return nil // nothing requested
 	}
 
-	const maxTries = 500
+	const maxTries = 1000
 	var (
 		status   uint8
 		validity uint8
@@ -106,7 +116,7 @@ func (d *Device) Update(which drivers.Measurement) error {
 	var gotData bool
 
 	// Poll DEVICE_STATUS until NEWDAT or timeout
-	for i := 0; i < maxTries; i++ {
+	for range maxTries {
 		var err error
 		status, err = d.read1(regStatus)
 		if err != nil {
@@ -130,26 +140,15 @@ func (d *Device) Update(which drivers.Measurement) error {
 	// Burst-read data regardless of validity state
 	d.wbuf[0] = regAQI
 	if err := d.bus.Tx(d.addr, d.wbuf[:1], d.rbuf[:5]); err != nil {
-		return err
+		return fmt.Errorf("ENS160: burst read failed: %w", err)
 	}
+
 	d.aqiUBA = d.rbuf[0]
 	d.tvocPPB = binary.LittleEndian.Uint16(d.rbuf[1:3])
 	d.eco2PPM = binary.LittleEndian.Uint16(d.rbuf[3:5])
-	d.validity = validity  // Store the validity status
+	d.validity = validity // Store the validity status
 
-	// Evaluate validity after data collection
-	switch validity {
-	case ValidityNormalOperation:
-		return nil
-	case ValidityInitialStartUpPhase:
-		return nil
-	case ValidityWarmUpPhase:
-		return nil
-	case ValidityInvalidOutput:
-		return errors.New("ENS160: invalid output")
-	default:
-		return fmt.Errorf("ENS160: unknown validity state: 0x%x", validity)
-	}
+	return nil
 }
 
 // TVOC returns the last total‑VOC concentration in parts‑per‑billion.
@@ -162,10 +161,23 @@ func (d *Device) ECO2() uint16 { return d.eco2PPM }
 func (d *Device) AQI() uint8 { return d.aqiUBA }
 
 // Validity returns the current operating state of the sensor.
-// Returns one of: ValidityNormalOperation, ValidityWarmUpPhase, 
-// ValidityInitialStartUpPhase, or ValidityInvalidOutput.
 func (d *Device) Validity() uint8 {
 	return d.validity
+}
+
+func (d *Device) ValidityString() string {
+	switch d.validity {
+	case ValidityNormalOperation:
+		return "OK: data is valid"
+	case ValidityWarmUpPhase:
+		return "WARM-UP: needs ~3 min until valid data"
+	case ValidityInitialStartUpPhase:
+		return "INITIAL START-UP: needs ~1 h until valid data"
+	case ValidityInvalidOutput:
+		return "INVALID OUTPUT: signals give unexpected values"
+	default:
+		return "UNKNOWN STATUS"
+	}
 }
 
 // write1 writes a single byte to a register.

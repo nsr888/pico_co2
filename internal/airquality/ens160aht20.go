@@ -2,8 +2,9 @@ package airquality
 
 import (
 	"fmt"
-	"machine"
+	"log"
 
+	"machine"
 	"tinygo.org/x/drivers"
 	"tinygo.org/x/drivers/aht20"
 
@@ -71,9 +72,9 @@ func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
 	if validity != ens160.ValidityNormalOperation {
 		switch validity {
 		case ens160.ValidityInitialStartUpPhase:
-			log.Print("ENS160: initial start-up phase (wait min. 1h for valid data)")
+			log.Print("ENS160: initial start-up phase (wait ~1h for valid data)")
 		case ens160.ValidityWarmUpPhase:
-			log.Print("ENS160: warm-up phase (wait min. 3min for valid data)")
+			log.Print("ENS160: warm-up phase (wait ~3min for valid data)")
 		case ens160.ValidityInvalidOutput:
 			log.Print("ENS160: invalid output detected")
 		}

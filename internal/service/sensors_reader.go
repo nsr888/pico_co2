@@ -42,9 +42,7 @@ func NewSensorReader(
 	return sr
 }
 
-func (sr *SensorReader) ProcessSensorReadings() {
-	logger := log.New(log.Writer(), "SensorReader: ", log.LstdFlags)
-
+func (sr *SensorReader) Process() {
 	readings, err := sr.airSensor.Read()
 	if err != nil {
 		log.Println("Error reading air quality sensor:", err)
@@ -59,9 +57,9 @@ func (sr *SensorReader) ProcessSensorReadings() {
 			sr.display.DisplayError(fmt.Sprintf("DS3231: %s", err.Error()))
 			return
 		}
-		logger = log.New(log.Writer(), dt.Format(time.RFC3339)+" ", 0)
+		log.SetPrefix(fmt.Sprintf("%s ", dt.Format(time.RFC3339)))
 	}
 
-	logger.Println("Sensor readings:", readings)
+	log.Println("Sensor readings:", readings)
 	sr.display.DisplayTextReadings(readings)
 }

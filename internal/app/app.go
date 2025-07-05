@@ -17,28 +17,24 @@ import (
 const (
 	sampleTimeSeconds = 60
 	watchDogMillis    = 8388 // max for RP2040 is 8388ms
+	i2cFrequency      = 400 * machine.KHz
+	i2cSDA            = machine.GP4
+	i2cSCL            = machine.GP5
 )
 
 type App struct {
-	led          machine.Pin
 	sensorReader *service.SensorReader
 }
 
 type Config struct {
-	I2cFrequency    uint32
-	I2cSDA          machine.Pin
-	I2cSCL          machine.Pin
 	IsAdvancedSetup bool
 }
 
 func New(cfg Config) (*App, error) {
-	led := machine.LED
-	led.Configure(machine.PinConfig{Mode: machine.PinOutput})
-
 	if err := machine.I2C0.Configure(machine.I2CConfig{
-		Frequency: cfg.I2cFrequency,
-		SDA:       cfg.I2cSDA,
-		SCL:       cfg.I2cSCL,
+		Frequency: i2cFrequency,
+		SDA:       i2cSDA,
+		SCL:       i2cSCL,
 	}); err != nil {
 		return nil, err
 	}
@@ -70,7 +66,6 @@ func New(cfg Config) (*App, error) {
 	)
 
 	return &App{
-		led:          led,
 		sensorReader: sensorReader,
 	}, nil
 }
@@ -85,15 +80,8 @@ func (a *App) Run() {
 	wd.Start()
 	log.Printf("starting loop")
 
-	a.led.Low()
 	for {
-		a.led.High()
-
-		a.sensorReader.ProcessSensorReadings()
-
-		time.Sleep(time.Millisecond * 200)
-		a.led.Low()
-
+		a.sensorReader.Process()
 		waitNextSample(sampleTimeSeconds)
 	}
 }

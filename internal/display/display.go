@@ -27,29 +27,23 @@ func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
 	})
 	log.Printf("Display configured: Width=%d, Height=%d, Address=%#x", displayWidth, displayHeight, displayAddress)
 
-	clear := func() {
-		display.ClearBuffer()
-		display.Display()
-	}
-	clear()
-
 	fontLib := font.NewDisplay(display)
 	return &FontDisplay{
-		font:  &fontLib,
-		clear: clear,
+		font:         &fontLib,
+		clearDisplay: display.ClearDisplay,
 	}, nil
 }
 
 type FontDisplay struct {
-	font  *font.Display
-	clear func()
+	font         *font.Display
+	clearDisplay func()
 }
 
 func (f *FontDisplay) DisplayBasic(r *types.Readings) {
 	if f == nil {
 		return
 	}
-	f.clear()
+	f.clearDisplay()
 	f.font.Configure(font.Config{FontType: font.FONT_16x26})
 	tempStr := fmt.Sprintf("%.0f", r.Temperature)
 	f.font.XPos = int16((128 - (len(tempStr) * 16)) / 2)
@@ -75,7 +69,7 @@ func (f *FontDisplay) DisplayError(msg string) {
 		lines = splitStringToLines(msg, 21)
 	}
 
-	f.clear()
+	f.clearDisplay()
 	f.font.Configure(font.Config{FontType: font.FONT_6x8})
 
 	for i, line := range lines {
@@ -106,7 +100,7 @@ func (f *FontDisplay) DisplayNumReadings(r *types.Readings) {
 	if f == nil {
 		return
 	}
-	f.clear()
+	f.clearDisplay()
 
 	// Big numbers for eCO2 and temperature
 	f.font.Configure(font.Config{FontType: font.FONT_16x26})
@@ -136,7 +130,7 @@ func (f *FontDisplay) DisplayTextReadings(r *types.Readings) {
 	if f == nil {
 		return
 	}
-	f.clear()
+	f.clearDisplay()
 
 	// Display CO2 status string at the top right corner
 	f.font.Configure(font.Config{FontType: font.FONT_7x10})
@@ -153,14 +147,21 @@ func (f *FontDisplay) DisplayTextReadings(r *types.Readings) {
 
 	// Small font
 	f.font.Configure(font.Config{FontType: font.FONT_7x10})
-	isValidStr := ""
+	co2Str := fmt.Sprintf("CO2 %d", r.CO2)
 	if !r.IsValid {
-		isValidStr = "*"
+		co2Str = fmt.Sprintf("CO2 %d*", r.CO2)
 	}
-	formatString := fmt.Sprintf("CO2 %d%s %.0fC %.0f%%", r.CO2, isValidStr, r.Temperature, r.Humidity)
 	f.font.XPos = 0
 	f.font.YPos = 24
-	f.font.PrintText(formatString)
+	f.font.PrintText(co2Str)
+	humStr := fmt.Sprintf("H %.0f", r.Humidity)
+	f.font.XPos = int16(128 - (len(humStr) * 7))
+	f.font.YPos = 24
+	f.font.PrintText(humStr)
+	tempStr := fmt.Sprintf("T %.0f", r.Temperature)
+	f.font.XPos = int16(128 - ((len(humStr) * 7) + (len(tempStr) * 7) + 8)) // 8 for padding
+	f.font.YPos = 24
+	f.font.PrintText(tempStr)
 }
 
 func printVerticalBar(count uint16) string {
