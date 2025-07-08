@@ -45,8 +45,8 @@ const (
 // Validity flags
 const (
 	ValidityNormalOperation     = 0x00
-	ValidityWarmUpPhase         = 0x01
-	ValidityInitialStartUpPhase = 0x02
+	ValidityWarmUpPhase         = 0x01 // need ~3 minutes until valid data
+	ValidityInitialStartUpPhase = 0x02 // need ~1 hour until valid data
 	ValidityInvalidOutput       = 0x03
 )
 

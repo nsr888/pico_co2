@@ -6,11 +6,9 @@ import (
 	"time"
 
 	"machine"
-	"tinygo.org/x/drivers/ds3231"
 
 	"pico_co2/internal/airquality"
 	"pico_co2/internal/display"
-	"pico_co2/internal/service"
 )
 
 // Application Logic
@@ -23,14 +21,11 @@ const (
 )
 
 type App struct {
-	sensorReader *service.SensorReader
+	airqualitySensor airquality.AirQualitySensor
+	fontDisplay      *display.FontDisplay
 }
 
-type Config struct {
-	IsAdvancedSetup bool
-}
-
-func New(cfg Config) (*App, error) {
+func New() (*App, error) {
 	if err := machine.I2C0.Configure(machine.I2CConfig{
 		Frequency: i2cFrequency,
 		SDA:       i2cSDA,
@@ -41,7 +36,7 @@ func New(cfg Config) (*App, error) {
 
 	fontDisplay, err := display.NewFontDisplay(machine.I2C0)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize display: %w", err)
 	}
 
 	airQualitySensor := airquality.NewENS160AHT20Adapter(machine.I2C0)
@@ -49,24 +44,9 @@ func New(cfg Config) (*App, error) {
 		return nil, fmt.Errorf("failed to configure air quality sensor: %w", err)
 	}
 
-	ds3231Sensor := ds3231.New(machine.I2C0)
-	if ok := ds3231Sensor.Configure(); !ok {
-		return nil, fmt.Errorf("failed to configure DS3231 sensor")
-	}
-
-	opts := []service.SensorReaderOption{}
-	if cfg.IsAdvancedSetup {
-		opts = append(opts, service.WithDS3231(&ds3231Sensor))
-	}
-
-	sensorReader := service.NewSensorReader(
-		airQualitySensor,
-		fontDisplay,
-		opts...,
-	)
-
 	return &App{
-		sensorReader: sensorReader,
+		airqualitySensor: airQualitySensor,
+		fontDisplay:      fontDisplay,
 	}, nil
 }
 
@@ -78,12 +58,30 @@ func (a *App) Run() {
 	}
 	wd.Configure(config)
 	wd.Start()
-	log.Printf("starting loop")
+	log.Println("Starting loop")
 
 	for {
-		a.sensorReader.Process()
+		a.UpdateReadingsAndDisplay()
 		waitNextSample(sampleTimeSeconds)
 	}
+}
+
+func (a *App) UpdateReadingsAndDisplay() {
+	readings, err := a.airqualitySensor.Read()
+	if err != nil {
+		log.Println("Error reading air quality sensor:", err)
+		a.fontDisplay.DisplayError(err.Error())
+		return
+	}
+
+	if readings.ValidityError != "" {
+		log.Printf("Sensor readings is invalid: %+v\n", readings)
+		a.fontDisplay.DisplayReadingsWithHI(readings)
+		return
+	}
+
+	log.Printf("Sensor readings: %+v\n", readings)
+	a.fontDisplay.DisplayReadingsWithHI(readings)
 }
 
 // waitNextSample pauses execution for a given number of seconds

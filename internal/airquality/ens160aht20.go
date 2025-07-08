@@ -2,7 +2,6 @@ package airquality
 
 import (
 	"fmt"
-	"log"
 
 	"machine"
 	"tinygo.org/x/drivers"
@@ -15,9 +14,9 @@ import (
 // ENS160AHT20Adapter adapts the combination of an ENS160 and AHT20 sensor
 // to the AirQualitySensor interface.
 type ENS160AHT20Adapter struct {
-	aht20    *aht20.Device
-	ens160   *ens160.Device
-	readings *types.Readings
+	aht20     *aht20.Device
+	ens160    *ens160.Device
+	startTime int64
 }
 
 // Verify that ENS160AHT20Adapter implements the AirQualitySensor interface.
@@ -67,32 +66,56 @@ func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
 		return nil, fmt.Errorf("failed to read ENS160: %w", err)
 	}
 
-	// Check validity state from the ENS160 sensor
-	validity := a.ens160.Validity()
-	if validity != ens160.ValidityNormalOperation {
-		switch validity {
-		case ens160.ValidityInitialStartUpPhase:
-			log.Print("ENS160: initial start-up phase (wait ~1h for valid data)")
-		case ens160.ValidityWarmUpPhase:
-			log.Print("ENS160: warm-up phase (wait ~3min for valid data)")
-		case ens160.ValidityInvalidOutput:
-			log.Print("ENS160: invalid output detected")
-		}
-	}
-
 	co2 := a.ens160.ECO2()
-	r := &types.Readings{
-		Temperature: temp,
-		Humidity:    hum,
-		CO2:         co2,
-		CO2String:   CO2String(co2),
-		IsValid:     validity == ens160.ValidityNormalOperation,
-	}
+	validity := a.ens160.Validity()
+	heatIndex := types.HeatIndex(temp, hum)
 
-	return r, nil
+	return &types.Readings{
+		Temperature:     temp,
+		Humidity:        hum,
+		CO2:             co2,
+		CO2Status:       CO2Status(co2),
+		ValidityError:   a.ValidityError(validity),
+		HeatIndex:       heatIndex,
+		HeatIndexStatus: types.HeatIndexStatus(heatIndex),
+	}, nil
 }
 
-func CO2String(value uint16) string {
+// ValidityError returns a human-readable error message based on the ENS160
+// validity status.
+func (a *ENS160AHT20Adapter) ValidityError(validity uint8) string {
+	switch validity {
+	case ens160.ValidityNormalOperation:
+		return ""
+	case ens160.ValidityWarmUpPhase:
+		const waitWarmUpMinutes = 3
+		minutesFromStart := (a.startTime / 60000) // Convert to minutes
+		minutesLeft := waitWarmUpMinutes - minutesFromStart
+		minutesLeftStr := fmt.Sprintf("~%d min", minutesLeft)
+		if minutesLeft <= 0 {
+			minutesLeftStr = ""
+		}
+
+		return fmt.Sprintf("WARM-UP %s", minutesLeftStr)
+	case ens160.ValidityInitialStartUpPhase:
+		const waitStartUpMinutes = 60
+		minutesFromStart := (a.startTime / 60000) // Convert to minutes
+		minutesLeft := waitStartUpMinutes - minutesFromStart
+		minutesLeftStr := fmt.Sprintf("~%d min", minutesLeft)
+		if minutesLeft <= 0 {
+			minutesLeftStr = ""
+		}
+		return fmt.Sprintf("START-UP %s", minutesLeftStr)
+	case ens160.ValidityInvalidOutput:
+		return "INVALID OUTPUT"
+	default:
+		return "UNKNOWN VALIDITY"
+	}
+}
+
+// CO2Status returns a human-readable status string based on the CO2
+// concentration value.
+func CO2Status(value uint16) string {
 	switch {
 	case value < 400:
 		return "No data"

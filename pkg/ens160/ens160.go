@@ -166,21 +166,6 @@ func (d *Device) Validity() uint8 {
 	return d.validity
 }
 
-func (d *Device) ValidityString() string {
-	switch d.validity {
-	case ValidityNormalOperation:
-		return "OK: data is valid"
-	case ValidityWarmUpPhase:
-		return "WARM-UP: needs ~3 min until valid data"
-	case ValidityInitialStartUpPhase:
-		return "INITIAL START-UP: needs ~1 h until valid data"
-	case ValidityInvalidOutput:
-		return "INVALID OUTPUT: signals give unexpected values"
-	default:
-		return "UNKNOWN STATUS"
-	}
-}
-
 // write1 writes a single byte to a register.
 func (d *Device) write1(reg, val uint8) error {
 	d.wbuf[0] = reg

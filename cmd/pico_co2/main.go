@@ -9,11 +9,7 @@ import (
 func main() {
 	log.SetFlags(0)
 
-	config := app.Config{
-		IsAdvancedSetup: false,
-	}
-
-	application, err := app.New(config)
+	application, err := app.New()
 	if err != nil {
 		log.Fatalf("application setup failed: %v", err)
 	}

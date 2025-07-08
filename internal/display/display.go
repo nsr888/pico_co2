@@ -3,6 +3,7 @@ package display
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	font "github.com/Nondzu/ssd1306_font"
 	"machine"
@@ -13,9 +14,9 @@ import (
 
 // Display Configuration
 const (
-	displayWidth   = 128
-	displayHeight  = 32
-	displayAddress = ssd1306.Address_128_32
+	displayWidth   int16 = 128
+	displayHeight  int16 = 32
+	displayAddress       = ssd1306.Address_128_32
 )
 
 func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
@@ -25,7 +26,7 @@ func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
 		Height:  displayHeight,
 		Address: displayAddress,
 	})
-	log.Printf("Display configured: Width=%d, Height=%d, Address=%#x", displayWidth, displayHeight, displayAddress)
+	log.Printf("Display configured: Width=%d, Height=%d, Address=%#x\n", displayWidth, displayHeight, displayAddress)
 
 	fontLib := font.NewDisplay(display)
 	return &FontDisplay{
@@ -44,40 +45,40 @@ func (f *FontDisplay) DisplayBasic(r *types.Readings) {
 		return
 	}
 	f.clearDisplay()
-	f.font.Configure(font.Config{FontType: font.FONT_16x26})
-	tempStr := fmt.Sprintf("%.0f", r.Temperature)
-	f.font.XPos = int16((128 - (len(tempStr) * 16)) / 2)
-	f.font.YPos = 0
-	f.font.PrintText(tempStr)
 
-	// Small font
-	f.font.Configure(font.Config{FontType: font.FONT_6x8})
-	formatString := fmt.Sprintf("Temp %.1fC Hum %.1f%%", r.Temperature, r.Humidity)
-	f.font.XPos = int16((128 - (len(formatString) * 6)) / 2)
-	f.font.YPos = 24
-	f.font.PrintText(formatString)
+	lines := strings.Split(r.ValidityError, ": ")
+
+	f.printLines(lines[:1])
+	f.printTempHumid(r.Humidity, r.Temperature)
 }
 
 func (f *FontDisplay) DisplayError(msg string) {
-	if f == nil || msg == "" {
+	// Split longer messages into multiple lines
+	lines := []string{msg}
+	maxCharPerLine := 128 / 7
+	if len(msg) > maxCharPerLine {
+		lines = splitStringToLines(msg, maxCharPerLine)
+	}
+
+	f.printLines(lines)
+}
+
+func (f *FontDisplay) printLines(lines []string) {
+	if f == nil || len(lines) == 0 {
 		return
 	}
 
-	// Split longer messages into multiple lines
-	lines := []string{msg}
-	if len(msg) > 21 {
-		lines = splitStringToLines(msg, 21)
-	}
-
 	f.clearDisplay()
-	f.font.Configure(font.Config{FontType: font.FONT_6x8})
+
+	f.font.Configure(font.Config{FontType: font.FONT_7x10})
 
 	for i, line := range lines {
-		if i > 3 { // Max 4 lines on a 32px display
+		if i >= 3 { // Max 3 lines on a 32px display
 			break
 		}
+
 		f.font.XPos = 0
-		f.font.YPos = int16(i * 8)
+		f.font.YPos = int16(i * 11)
 		f.font.PrintText(line)
 	}
 }
@@ -121,9 +122,9 @@ func (f *FontDisplay) DisplayNumReadings(r *types.Readings) {
 	f.font.XPos = int16(128 - (len(tempTitleStr) * 6))
 	f.font.YPos = 24
 	f.font.PrintText(tempTitleStr)
-	f.font.XPos = int16(128-(len(r.CO2String)*6)) / 2
+	f.font.XPos = int16(128-(len(r.CO2Status)*6)) / 2
 	f.font.YPos = 24
-	f.font.PrintText(r.CO2String)
+	f.font.PrintText(r.CO2Status)
 }
 
 func (f *FontDisplay) DisplayTextReadings(r *types.Readings) {
@@ -134,7 +135,7 @@ func (f *FontDisplay) DisplayTextReadings(r *types.Readings) {
 
 	// Display CO2 status string at the top right corner
 	f.font.Configure(font.Config{FontType: font.FONT_7x10})
-	status := r.CO2String
+	status := r.CO2Status
 	f.font.XPos = int16(128 - (len(status) * 7))
 	f.font.YPos = 0
 	f.font.PrintText(status)
@@ -143,42 +144,142 @@ func (f *FontDisplay) DisplayTextReadings(r *types.Readings) {
 	f.font.Configure(font.Config{FontType: font.FONT_11x18})
 	f.font.XPos = 0
 	f.font.YPos = 0
-	f.font.PrintText(printVerticalBar(r.CO2))
+	f.font.PrintText(printBar(r.CO2))
 
 	// Small font
 	f.font.Configure(font.Config{FontType: font.FONT_7x10})
 	co2Str := fmt.Sprintf("CO2 %d", r.CO2)
-	if !r.IsValid {
+	if r.ValidityError != "" {
 		co2Str = fmt.Sprintf("CO2 %d*", r.CO2)
 	}
 	f.font.XPos = 0
 	f.font.YPos = 24
 	f.font.PrintText(co2Str)
-	humStr := fmt.Sprintf("H %.0f", r.Humidity)
+
+	f.printTempHumid(r.Humidity, r.Temperature)
+}
+
+func (f *FontDisplay) printTempHumid(humidity, temperature float32) {
+	if f == nil {
+		return
+	}
+
+	humStr := fmt.Sprintf("H %.0f", humidity)
 	f.font.XPos = int16(128 - (len(humStr) * 7))
 	f.font.YPos = 24
 	f.font.PrintText(humStr)
-	tempStr := fmt.Sprintf("T %.0f", r.Temperature)
+	tempStr := fmt.Sprintf("T %.0f", temperature)
 	f.font.XPos = int16(128 - ((len(humStr) * 7) + (len(tempStr) * 7) + 8)) // 8 for padding
 	f.font.YPos = 24
 	f.font.PrintText(tempStr)
 }
 
-func printVerticalBar(count uint16) string {
-	var result string
+func printBar(count uint16) string {
 	cnt := int(count)
 
 	cnt = cnt - 400 // Adjust count to start from 400
 
 	if cnt <= 0 {
-		return result
+		return ""
 	}
 
-	numBars := cnt / 100
+	numBars := cnt / 100 // Corrected value 1 - 11
 
-	for i := 0; i < numBars; i++ {
-		result += "|"
+	return strings.Repeat("|", numBars)
+}
+
+func (f *FontDisplay) DisplayBigReadings(r *types.Readings) {
+	if f == nil {
+		return
+	}
+	f.clearDisplay()
+
+	// Status top right corner
+	f.font.Configure(font.Config{FontType: font.FONT_7x10})
+	status := r.CO2Status
+	f.font.YPos = 0
+	f.font.XPos = int16(128 - (len(status) * 7))
+	if r.ValidityError != "" {
+		status = r.ValidityError
+		f.font.XPos = 0
+	}
+	f.font.PrintText(status)
+
+	// Bars for CO2 level
+	if r.ValidityError == "" {
+		f.font.Configure(font.Config{FontType: font.FONT_7x10})
+		f.font.YPos = 0
+		f.font.XPos = 0
+		f.font.PrintText(printBar(r.CO2))
 	}
 
-	return result
+	// Bottom big numbers
+	if r.ValidityError == "" {
+		f.font.Configure(font.Config{FontType: font.FONT_11x18})
+		f.font.YPos = 16
+		f.font.XPos = 0
+		f.font.PrintText(fmt.Sprintf("%d", r.CO2))
+	}
+
+	f.font.Configure(font.Config{FontType: font.FONT_11x18})
+	temp := fmt.Sprintf("%.0f", r.Temperature)
+	f.font.YPos = 16
+	f.font.XPos = 64
+	f.font.PrintText(temp)
+
+	hum := fmt.Sprintf("%.0f", r.Humidity)
+	f.font.YPos = 16
+	f.font.XPos = 128 - 22 - 6
+	f.font.PrintText(hum)
+}
+
+func (f *FontDisplay) DisplayReadingsWithHI(r *types.Readings) {
+	if f == nil {
+		return
+	}
+	f.clearDisplay()
+
+	// CO2Status
+	f.font.Configure(font.Config{FontType: font.FONT_7x10})
+	status := fmt.Sprintf(
+		"CO2 %s",
+		strings.Repeat("*", r.CO2Rating()),
+	)
+	f.font.YPos = 0
+	f.font.XPos = 0
+	if r.ValidityError != "" {
+		status = r.ValidityError
+		f.font.XPos = 0
+	}
+	f.font.PrintText(status)
+
+	if r.ValidityError == "" {
+		// CO2 value
+		f.font.Configure(font.Config{FontType: font.FONT_11x18})
+		co2Value := fmt.Sprintf("%d", r.CO2)
+		f.font.YPos = 0
+		f.font.XPos = int16(128 - (len(co2Value) * 11))
+		f.font.PrintText(co2Value)
+	}
+
+	// Heat Index status
+	f.font.Configure(font.Config{FontType: font.FONT_7x10})
+	hiStatus := fmt.Sprintf(
+		"HI %s",
+		strings.Repeat("*", r.HeatIndexRating()),
+	)
+	f.font.YPos = 24
+	f.font.XPos = 0
+	f.font.PrintText(hiStatus)
+
+	f.font.Configure(font.Config{FontType: font.FONT_11x18})
+	temp := fmt.Sprintf("%.0f", r.Temperature)
+	f.font.YPos = 16
+	f.font.XPos = 70
+	f.font.PrintText(temp)
+
+	hum := fmt.Sprintf("%.0f", r.Humidity)
+	f.font.YPos = 16
+	f.font.XPos = 128 - 22
+	f.font.PrintText(hum)
 }
