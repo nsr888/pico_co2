@@ -2,6 +2,7 @@ package airquality
 
 import (
 	"fmt"
+	"time"
 
 	"machine"
 	"tinygo.org/x/drivers"
@@ -26,8 +27,9 @@ var _ AirQualitySensor = (*ENS160AHT20Adapter)(nil)
 func NewENS160AHT20Adapter(bus *machine.I2C) *ENS160AHT20Adapter {
 	aht20Device := aht20.New(bus)
 	return &ENS160AHT20Adapter{
-		aht20:  &aht20Device,
-		ens160: ens160.New(bus, ens160.DefaultAddress),
+		aht20:     &aht20Device,
+		ens160:    ens160.New(bus, ens160.DefaultAddress),
+		startTime: time.Now().UnixMilli(),
 	}
 }
 
@@ -71,13 +73,13 @@ func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
 	heatIndex := types.HeatIndex(temp, hum)
 
 	return &types.Readings{
-		Temperature:     temp,
-		Humidity:        hum,
-		CO2:             co2,
-		CO2Status:       CO2Status(co2),
-		ValidityError:   a.ValidityError(validity),
-		HeatIndex:       heatIndex,
-		HeatIndexStatus: types.HeatIndexStatus(heatIndex),
+		AQI:           a.ens160.AQI(),
+		Temperature:   temp,
+		Humidity:      hum,
+		CO2:           co2,
+		CO2Status:     CO2Status(co2),
+		ValidityError: a.ValidityError(validity),
+		HeatIndex:     heatIndex,
 	}, nil
 }
 
@@ -89,7 +91,8 @@ func (a *ENS160AHT20Adapter) ValidityError(validity uint8) string {
 		return ""
 	case ens160.ValidityWarmUpPhase:
 		const waitWarmUpMinutes = 3
-		minutesFromStart := (a.startTime / 60000) // Convert to minutes
+		now := time.Now().UnixMilli()
+		minutesFromStart := ((now - a.startTime) / 60000) // Convert to minutes
 		minutesLeft := waitWarmUpMinutes - minutesFromStart
 		minutesLeftStr := fmt.Sprintf("~%d min", minutesLeft)
 		if minutesLeft <= 0 {

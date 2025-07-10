@@ -74,14 +74,8 @@ func (a *App) UpdateReadingsAndDisplay() {
 		return
 	}
 
-	if readings.ValidityError != "" {
-		log.Printf("Sensor readings is invalid: %+v\n", readings)
-		a.fontDisplay.DisplayReadingsWithHI(readings)
-		return
-	}
-
 	log.Printf("Sensor readings: %+v\n", readings)
-	a.fontDisplay.DisplayReadingsWithHI(readings)
+	a.fontDisplay.DisplayComfortIndex(readings)
 }
 
 // waitNextSample pauses execution for a given number of seconds
