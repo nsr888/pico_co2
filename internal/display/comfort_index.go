@@ -2,9 +2,11 @@ package display
 
 import (
 	"fmt"
+	"image/color"
 
-	font "github.com/Nondzu/ssd1306_font"
+	"tinygo.org/x/tinydraw"
 
+	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
 )
 
@@ -14,34 +16,76 @@ func (f *FontDisplay) DisplayComfortIndex(r *types.Readings) {
 	}
 	f.clearDisplay()
 
-	f.font.Configure(font.Config{FontType: font.FONT_7x10})
+	font7 := font.NewFont7(f.display)
+
 	status := r.ComfortStatus()
-	f.font.YPos = 0
-	f.font.XPos = 0
 	if r.ValidityError != "" {
 		status = r.ValidityError
-		f.font.XPos = 0
 	}
-	f.font.PrintText(status)
+	font7.Print(0, 0, status)
 
+	f.DrawHorizontalBar(0, 13, int16(r.AQI))
+
+	font11 := font.NewFont11(f.display)
 	if r.ValidityError == "" {
-		f.font.Configure(font.Config{FontType: font.FONT_11x18})
-		f.font.YPos = 16
-		f.font.XPos = 0
-		f.font.PrintText(fmt.Sprintf("%d", r.CO2))
+	}
+	co2Str := fmt.Sprintf("%d", r.CO2)
+	co2end := font11.Print(0, 16, co2Str)
+	f.DrawVerticalBar(co2end+3, 16, r.CO2Index())
+
+	var verticalBarWidth int16 = 9
+	hum := fmt.Sprintf("%.0f", r.Humidity)
+	humWidth := font11.CalcWidth(hum) + verticalBarWidth
+	humPos := int16(128 - humWidth)
+	font11.Print(humPos, 16, hum)
+	f.DrawVerticalBar(128-6, 16, r.HumidityComfortIndex())
+
+	spaceBetween := int16(6)
+
+	temp := fmt.Sprintf("%.0f", r.Temperature)
+	tempWidth := font11.CalcWidth(temp) + verticalBarWidth
+	font11.Print(int16(humPos-spaceBetween-tempWidth), 16, temp)
+	f.DrawVerticalBar(humPos-spaceBetween-6, 16, r.TempComfortIndex())
+	f.display.Display()
+}
+
+func (f *FontDisplay) DrawVerticalBar(x, y, filledBars int16) {
+	if f == nil {
+		return
 	}
 
-	f.font.Configure(font.Config{FontType: font.FONT_11x18})
-	hum := fmt.Sprintf("%.0f", r.Humidity)
-	f.font.YPos = 16
-	f.font.XPos = 128 - 22
-	f.font.PrintText(hum)
+	black := color.RGBA{1, 1, 1, 255}
 
-	f.font.Configure(font.Config{FontType: font.FONT_11x18})
-	temp := fmt.Sprintf("%.0f", r.Temperature)
-	f.font.YPos = 16
-	f.font.XPos = int16(128 - len(temp)*11 - len(hum)*11 - 11)
-	f.font.PrintText(temp)
+	const maxBars = 4
 
-	f.humFIFO.Enqueue(int16(r.CO2))
+	y += 2
+
+	unfilledBars := maxBars - filledBars
+
+	// Draw filled bars
+	for i := int16(0); i < unfilledBars; i++ {
+		f.display.SetPixel(x, y+i*4, black)
+	}
+
+	// Draw empty bars
+	for i := unfilledBars; i < 4; i++ {
+		tinydraw.Line(f.display, x, y+i*4, x+3, y+i*4, black)
+	}
+}
+
+func (r *FontDisplay) DrawHorizontalBar(x, y, filledBars int16) {
+	if r == nil {
+		return
+	}
+
+	black := color.RGBA{1, 1, 1, 255}
+
+	const maxBars = 5
+	spaceBetween := int16(4)
+	sectionWidth := int16(128-spaceBetween*(maxBars-1)) / maxBars
+
+	// Draw filled bars
+	for i := int16(0); i < filledBars; i++ {
+		tinydraw.Line(r.display, x+i*sectionWidth+spaceBetween*i, y, x+i*sectionWidth+spaceBetween*i+sectionWidth, y, black)
+	}
 }

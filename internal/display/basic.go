@@ -4,24 +4,25 @@ import (
 	"fmt"
 	"strings"
 
+	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
 )
 
-func (f *FontDisplay) DisplayBasicTempAndHumidity(r *types.Readings) {
+func (f *FontDisplay) DisplayBasic(r *types.Readings) {
 	if f == nil {
 		return
 	}
 	f.clearDisplay()
 
-	lines := strings.Split(r.ValidityError, ": ")
+	errMsg := strings.Split(r.ValidityError, ": ")
 
-	f.printLines(lines[:1])
+	font7 := font.NewFont7(f.display)
+
+	f.printLines(errMsg[:1], font7)
+
 	humStr := fmt.Sprintf("H %.0f", r.Humidity)
-	f.font.XPos = int16(128 - (len(humStr) * 7))
-	f.font.YPos = 24
-	f.font.PrintText(humStr)
+	font7.Print(int16(128-font7.CalcWidth(humStr)), 24, humStr)
+
 	tempStr := fmt.Sprintf("T %.0f", r.Temperature)
-	f.font.XPos = int16(128 - ((len(humStr) * 7) + (len(tempStr) * 7) + 8)) // 8 for padding
-	f.font.YPos = 24
-	f.font.PrintText(tempStr)
+	font7.Print(int16(128-font7.CalcWidth(humStr)-font7.CalcWidth(tempStr)-8), 24, tempStr)
 }

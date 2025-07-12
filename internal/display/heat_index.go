@@ -5,9 +5,9 @@ import (
 	"image/color"
 	"log"
 
-	font "github.com/Nondzu/ssd1306_font"
 	"tinygo.org/x/tinydraw"
 
+	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
 )
 
@@ -17,44 +17,39 @@ func (f *FontDisplay) DisplayReadingsWithHI(r *types.Readings) {
 	}
 	f.clearDisplay()
 
+	radiusFilled := int16(3)
+
+	font7 := font.NewFont7(f.display)
 	if r.ValidityError != "" {
-		f.font.Configure(font.Config{FontType: font.FONT_7x10})
-		f.font.YPos = 0
-		f.font.XPos = 0
-		f.font.XPos = 0
-		f.font.PrintText(r.ValidityError)
+		font7.Print(0, 0, r.ValidityError)
 	} else {
 		// CO2Status
-		f.font.Configure(font.Config{FontType: font.FONT_7x10})
 		status := "CO2"
-		f.font.YPos = 0
-		f.font.XPos = 0
-		f.font.PrintText(status)
+		font7.Print(0, 0, status)
 
-		f.DrawBar(30, 4, r.CO2Rating())
+		f.DrawBar(30, 4, r.CO2Index(), radiusFilled)
 
 		// CO2 value
-		f.font.Configure(font.Config{FontType: font.FONT_11x18})
 		co2Value := fmt.Sprintf("%d", r.CO2)
-		f.font.YPos = 0
-		f.font.XPos = int16(128 - (len(co2Value) * 11))
-		f.font.PrintText(co2Value)
+		YPos := int16(0)
+		XPos := int16(128 - (len(co2Value) * 11))
+		font7.Print(XPos, YPos, co2Value)
 	}
 
 	// Heat Index status
-	f.font.Configure(font.Config{FontType: font.FONT_7x10})
 	hiStatus := "HI"
-	f.font.YPos = 10
-	f.font.XPos = 0
-	f.font.PrintText(hiStatus)
+	var YPos int16 = 10
+	var XPos int16 = 0
+	font7.Print(XPos, YPos, hiStatus)
 
-	f.DrawBar(30, 14, r.HeatIndexRating())
+	f.DrawBar(30, 14, r.HeatIndexRating(), radiusFilled)
 
-	f.font.Configure(font.Config{FontType: font.FONT_11x18})
+	font11 := font.NewFont11(f.display)
+
 	tempHum := fmt.Sprintf("%.0f %.0f", r.Temperature, r.Humidity)
-	f.font.YPos = 16
-	f.font.XPos = int16(128 - (len(tempHum) * 11))
-	f.font.PrintText(tempHum)
+	YPos = 16
+	XPos = int16(128 - (len(tempHum) * 11))
+	font11.Print(XPos, YPos, tempHum)
 
 	f.humFIFO.Enqueue(int16(r.Humidity))
 	f.GraphHumidity(0, 18)
@@ -98,7 +93,7 @@ func (f *FontDisplay) GraphHumidity(x, y int16) {
 }
 
 // max bars is 4
-func (f *FontDisplay) DrawBar(x, y, filledBars int16) {
+func (f *FontDisplay) DrawBar(x, y, filledBars int16, filledRadius int16) {
 	if f == nil {
 		return
 	}
@@ -109,8 +104,7 @@ func (f *FontDisplay) DrawBar(x, y, filledBars int16) {
 
 	// Draw filled bars
 	for i := int16(0); i < filledBars; i++ {
-		radius := int16(3)
-		tinydraw.FilledCircle(f.display, x+i*10, y, radius, black)
+		tinydraw.FilledCircle(f.display, x+i*10, y, filledRadius, black)
 	}
 
 	// Draw empty bars

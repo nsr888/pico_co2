@@ -75,7 +75,7 @@ func (a *App) UpdateReadingsAndDisplay() {
 	}
 
 	log.Printf("Sensor readings: %+v\n", readings)
-	a.fontDisplay.DisplayComfortIndex(readings)
+	a.fontDisplay.DisplayComfortIndexTinyFont(readings)
 }
 
 // waitNextSample pauses execution for a given number of seconds

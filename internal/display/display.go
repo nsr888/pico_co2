@@ -1,11 +1,11 @@
 package display
 
 import (
+	"image/color"
 	"log"
 
-	"machine"
-
 	font "github.com/Nondzu/ssd1306_font"
+	"machine"
 	"tinygo.org/x/drivers/ssd1306"
 
 	"pico_co2/pkg/fifo"
@@ -21,6 +21,17 @@ const (
 	graphHeight    int16 = 14
 	barWidth       int16 = 1
 )
+
+type FontDisplay struct {
+	display      *ssd1306.Device
+	font         *font.Display
+	clearDisplay func()
+	humFIFO      *fifo.FIFO16
+	sparkline    *sparkline.Sparkline
+	color        color.RGBA
+	width        int16
+	height       int16
+}
 
 func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
 	display := ssd1306.NewI2C(bus)
@@ -41,13 +52,8 @@ func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
 		display:      &display,
 		humFIFO:      fifo.NewFIFO16(int(graphMeasurementsCount)),
 		sparkline:    sparkline.NewSparkline(int(graphHeight)),
+		color:        color.RGBA{1, 1, 1, 255},
+		width:        displayWidth,
+		height:       displayHeight,
 	}, nil
-}
-
-type FontDisplay struct {
-	display      *ssd1306.Device
-	font         *font.Display
-	clearDisplay func()
-	humFIFO      *fifo.FIFO16
-	sparkline    *sparkline.Sparkline
 }

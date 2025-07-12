@@ -1,37 +1,34 @@
 package display
 
-import (
-	font "github.com/Nondzu/ssd1306_font"
-)
+import "pico_co2/internal/display/font"
 
 func (f *FontDisplay) DisplayError(msg string) {
 	// Split longer messages into multiple lines
 	lines := []string{msg}
-	maxCharPerLine := 128 / 7
-	if len(msg) > maxCharPerLine {
-		lines = splitStringToLines(msg, maxCharPerLine)
+
+	fp := font.NewFont7(f.display)
+
+	maxCharPerLine := f.width / fp.Width()
+	if len(msg) > int(maxCharPerLine) {
+		lines = splitStringToLines(msg, int(maxCharPerLine))
 	}
 
-	f.printLines(lines)
+	f.printLines(lines, fp)
 }
 
-func (f *FontDisplay) printLines(lines []string) {
+func (f *FontDisplay) printLines(lines []string, fp font.FontPrinter) {
 	if f == nil || len(lines) == 0 {
 		return
 	}
 
-	f.clearDisplay()
-
-	f.font.Configure(font.Config{FontType: font.FONT_7x10})
+	maxLines := f.height / (fp.Height() + 1)
 
 	for i, line := range lines {
-		if i >= 3 { // Max 3 lines on a 32px display
+		if i >= int(maxLines) {
 			break
 		}
 
-		f.font.XPos = 0
-		f.font.YPos = int16(i * 11)
-		f.font.PrintText(line)
+		fp.Print(0, int16(i)*(fp.Height()+1), line)
 	}
 }
 

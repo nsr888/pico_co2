@@ -24,22 +24,22 @@ type Device struct {
 	addr uint16      // 7‑bit bus address, promoted to uint16 per drivers.I2C
 
 	// shadow registers / last measurements
-	tvocPPB  uint16
-	eco2PPM  uint16
-	aqiUBA   uint8
-	validity uint8 // Store the latest validity status
+	lastTvocPPB  uint16
+	lastEco2PPM  uint16
+	lastAqiUBA   uint8
+	lastValidity uint8 // Store the latest validity status
 
-	// pre‑allocated buffers (do **not** enlarge at runtime!)
+	// pre‑allocated buffers
 	wbuf [6]byte // longest write: reg + 4 bytes (TEMP+RH)
 	rbuf [5]byte // longest read: DATA burst (5 bytes)
 }
 
 // New returns a new ENS160 driver.
-func New(bus drivers.I2C, address uint16) *Device {
-	if address == 0 {
-		address = DefaultAddress
+func New(bus drivers.I2C, addr uint16) *Device {
+	if addr == 0 {
+		addr = DefaultAddress
 	}
-	return &Device{bus: bus, addr: address}
+	return &Device{bus: bus, addr: addr}
 }
 
 // Configure sets up the device for reading.
@@ -144,26 +144,26 @@ func (d *Device) Update(which drivers.Measurement) error {
 		return fmt.Errorf("ENS160: burst read failed: %w", err)
 	}
 
-	d.aqiUBA = d.rbuf[0]
-	d.tvocPPB = binary.LittleEndian.Uint16(d.rbuf[1:3])
-	d.eco2PPM = binary.LittleEndian.Uint16(d.rbuf[3:5])
-	d.validity = validity // Store the validity status
+	d.lastAqiUBA = d.rbuf[0]
+	d.lastTvocPPB = binary.LittleEndian.Uint16(d.rbuf[1:3])
+	d.lastEco2PPM = binary.LittleEndian.Uint16(d.rbuf[3:5])
+	d.lastValidity = validity // Store the validity status
 
 	return nil
 }
 
 // TVOC returns the last total‑VOC concentration in parts‑per‑billion.
-func (d *Device) TVOC() uint16 { return d.tvocPPB }
+func (d *Device) TVOC() uint16 { return d.lastTvocPPB }
 
 // ECO2 returns the last equivalent CO₂ concentration in parts‑per‑million.
-func (d *Device) ECO2() uint16 { return d.eco2PPM }
+func (d *Device) ECO2() uint16 { return d.lastEco2PPM }
 
 // AQI returns the last Air‑Quality Index according to UBA (1–5).
-func (d *Device) AQI() uint8 { return d.aqiUBA }
+func (d *Device) AQI() uint8 { return d.lastAqiUBA }
 
 // Validity returns the current operating state of the sensor.
 func (d *Device) Validity() uint8 {
-	return d.validity
+	return d.lastValidity
 }
 
 // write1 writes a single byte to a register.
