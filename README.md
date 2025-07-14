@@ -13,7 +13,7 @@ This project is designed to measure CO2 levels, air quality, and other environme
 
 ### Connection
 
-![Image](https://github.com/user-attachments/assets/a3db4534-e092-4903-9f99-1fe5824c7bd3)
+![pico_co2_](https://github.com/user-attachments/assets/616411a3-a43a-46e7-acf2-e7d9d982135e)
 
 ## Software installation
 
@@ -23,7 +23,8 @@ make flash
 
 ## Case
 
-![Image](https://github.com/user-attachments/assets/db7151cf-6b90-4819-a6e3-5002a788fd2c)
+![20250714_065327_](https://github.com/user-attachments/assets/1119b4b1-9fd0-45b7-aa6f-d544de5fbf7b)
+
 
 ## Development
 ### requirements for vim development
