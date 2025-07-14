@@ -11,6 +11,27 @@ type Readings struct {
 	HeatIndex     float32 `json:"heat_index"`
 }
 
+func (r *Readings) AQIStatus() string {
+	if r == nil {
+		return "No data"
+	}
+
+	switch r.AQI {
+	case 1:
+		return "Excellent"
+	case 2:
+		return "Good"
+	case 3:
+		return "Moderate"
+	case 4:
+		return "Poor"
+	case 5:
+		return "Unhealthy"
+	default:
+		return "Unknown AQI"
+	}
+}
+
 // ComfortStatus returns a human-readable comfort status based on sensor readings.
 func (r *Readings) ComfortStatus() string {
 	switch {

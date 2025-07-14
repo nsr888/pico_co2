@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	font "github.com/Nondzu/ssd1306_font"
-
+	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
 )
 
@@ -14,38 +13,39 @@ func (f *FontDisplay) DisplayWithLargeCO2Bar(r *types.Readings) {
 		return
 	}
 	f.clearDisplay()
+	font7 := font.NewFont7(f.display)
+	font11 := font.NewFont11(f.display)
 
 	// Display CO2 status string at the top right corner
-	f.font.Configure(font.Config{FontType: font.FONT_7x10})
 	status := r.CO2Status
-	f.font.XPos = int16(128 - (len(status) * 7))
-	f.font.YPos = 0
-	f.font.PrintText(status)
+	var (
+		XPos       = int16(128 - (len(status) * 7))
+		YPos int16 = 0
+	)
+	font7.Print(XPos, YPos, status)
 
 	// Bars for CO2 level
-	f.font.Configure(font.Config{FontType: font.FONT_11x18})
-	f.font.XPos = 0
-	f.font.YPos = 0
-	f.font.PrintText(printBar(r.CO2))
+	XPos = 0
+	YPos = 0
+	font11.Print(XPos, YPos, printBar(r.CO2))
 
 	// Small font
-	f.font.Configure(font.Config{FontType: font.FONT_7x10})
 	co2Str := fmt.Sprintf("CO2 %d", r.CO2)
 	if r.ValidityError != "" {
 		co2Str = fmt.Sprintf("CO2 %d*", r.CO2)
 	}
-	f.font.XPos = 0
-	f.font.YPos = 24
-	f.font.PrintText(co2Str)
+	XPos = 0
+	YPos = 24
+	font7.Print(XPos, YPos, co2Str)
 
 	humStr := fmt.Sprintf("H %.0f", r.Humidity)
-	f.font.XPos = int16(128 - (len(humStr) * 7))
-	f.font.YPos = 24
-	f.font.PrintText(humStr)
+	XPos = int16(128 - (len(humStr) * 7))
+	YPos = 24
+	font7.Print(XPos, YPos, humStr)
 	tempStr := fmt.Sprintf("T %.0f", r.Temperature)
-	f.font.XPos = int16(128 - ((len(humStr) * 7) + (len(tempStr) * 7) + 8)) // 8 for padding
-	f.font.YPos = 24
-	f.font.PrintText(tempStr)
+	XPos = int16(128 - ((len(humStr) * 7) + (len(tempStr) * 7) + 8)) // 8 for padding
+	YPos = 24
+	font7.Print(XPos, YPos, tempStr)
 }
 
 func printBar(count uint16) string {
