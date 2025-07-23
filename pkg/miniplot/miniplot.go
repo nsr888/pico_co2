@@ -2,6 +2,7 @@ package miniplot
 
 import (
 	"image/color"
+	"log"
 
 	"tinygo.org/x/drivers"
 	"tinygo.org/x/tinydraw"
@@ -76,10 +77,10 @@ func (mp *MiniPlot) DrawLineChart(data []int16) error {
 
 	// Draw axes
 	mp.drawAxis(maxVal, minVal)
-	
+
 	// Draw data
 	mp.drawData(data, minVal, maxVal)
-	
+
 	return nil
 }
 
@@ -88,26 +89,30 @@ func (mp *MiniPlot) drawText(x, y int16, text string) {
 }
 
 func (mp *MiniPlot) drawAxis(maxValue, minValue int16) {
+	startX := int16(20) // Start X position for the axis
+	startY := int16(22) // Start Y position for the axis
+
 	// Draw Y-axis line
-	tinydraw.Line(mp.display, 20, 0, 20, mp.DisplayHeight-1, mp.Color)
-	
+	tinydraw.Line(mp.display, startX, startY, startX, 0, mp.Color)
+
 	// Draw X-axis line
-	tinydraw.Line(mp.display, 20, mp.DisplayHeight-1, mp.DisplayWidth-1, mp.DisplayHeight-1, mp.Color)
+	tinydraw.Line(mp.display, startX, startY, mp.DisplayWidth-1, startY, mp.Color)
 
 	// Draw Y-axis labels
 	rangeVal := maxValue - minValue
 	if rangeVal == 0 {
 		rangeVal = 1
 	}
-	
+
+	// X-axis labels
 	label := mp.formatValue(minValue)
-	mp.drawText(0, mp.DisplayHeight-1-mp.fontHeight, label)
-	
-	label = mp.formatValue((maxValue+minValue)/2)
-	mp.drawText(0, mp.DisplayHeight/2, label)
-	
+	mp.drawText(0, mp.DisplayHeight-startY, label)
+
+	label = mp.formatValue((maxValue + minValue) / 2)
+	mp.drawText(0, (mp.DisplayHeight-startY)/2, label)
+
 	label = mp.formatValue(maxValue)
-	mp.drawText(0, 0, label)
+	mp.drawText(0, mp.fontHeight, label)
 }
 
 // drawGrid draws a grid on the plot.
@@ -115,10 +120,19 @@ func (mp *MiniPlot) drawAxis(maxValue, minValue int16) {
 func (mp *MiniPlot) drawGrid() {
 }
 
+// drawData draws the line chart based on the provided data.
 func (mp *MiniPlot) drawData(data []int16, minValue, maxValue int16) {
+	startX := int16(20) // Start X position for the axis
+	startY := int16(22) // Start Y position for the axis
 	if len(data) == 0 {
 		return
 	}
+
+	// Leave only the last part of the data if it exceeds the display width
+	if len(data) > int(mp.DisplayWidth-startX-1) {
+		data = data[len(data)-(int(mp.DisplayWidth-startX-1)):]
+	}
+	log.Printf("Data length after trimming: %d", len(data))
 
 	rangeVal := float64(maxValue - minValue)
 	if rangeVal == 0 {
@@ -126,21 +140,20 @@ func (mp *MiniPlot) drawData(data []int16, minValue, maxValue int16) {
 	}
 
 	// Calculate scaling factors
-	xScale := float64(mp.DisplayWidth-21) / float64(len(data)-1)
-	yScale := float64(mp.DisplayHeight-2) / rangeVal
+	yScale := float64(startY-1) / rangeVal
 
 	// Draw line chart
-	prevX := int16(21)
+	prevX := int16(startX + 1)
 	prevY := int16(float64(maxValue-data[0]) * yScale)
-	
+
 	for i, value := range data {
 		if i == 0 {
 			continue
 		}
-		
-		x := int16(21 + float64(i)*xScale)
-		y := int16(float64(maxValue-value) * yScale)
-		
+
+		x := startX + int16(1+i)
+		y := startY - int16(float64(maxValue-value)*yScale)
+
 		tinydraw.Line(mp.display, prevX, prevY, x, y, mp.Color)
 		prevX, prevY = x, y
 	}
@@ -149,7 +162,7 @@ func (mp *MiniPlot) drawData(data []int16, minValue, maxValue int16) {
 func (mp *MiniPlot) formatValue(value int16) string {
 	// Format value to fit in small space
 	if value >= 1000 {
-		return string(rune('0' + (value/1000)%10)) + "k"
+		return string(rune('0'+(value/1000)%10)) + "k"
 	}
 	return string(rune('0' + value%1000))
 }
