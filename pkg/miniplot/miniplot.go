@@ -106,13 +106,13 @@ func (mp *MiniPlot) drawAxis(maxValue, minValue int16) {
 
 	// X-axis labels
 	label := mp.formatValue(minValue)
-	mp.drawText(0, mp.DisplayHeight-startY, label)
+	mp.drawText(1, mp.DisplayHeight-startY, label)
 
 	label = mp.formatValue((maxValue + minValue) / 2)
-	mp.drawText(0, (mp.DisplayHeight-startY)/2, label)
+	mp.drawText(1, (mp.DisplayHeight-startY)/2, label)
 
 	label = mp.formatValue(maxValue)
-	mp.drawText(0, mp.fontHeight, label)
+	mp.drawText(1, mp.fontHeight, label)
 }
 
 // drawGrid draws a grid on the plot.
@@ -160,9 +160,8 @@ func (mp *MiniPlot) drawData(data []int16, minValue, maxValue int16) {
 }
 
 func (mp *MiniPlot) formatValue(value int16) string {
-	// Format value to fit in small space
 	if value >= 1000 {
-		return string(rune('0'+(value/1000)%10)) + "k"
+		return "k"
 	}
 	return string(rune('0' + value%1000))
 }

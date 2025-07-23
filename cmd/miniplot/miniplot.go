@@ -41,7 +41,7 @@ func main() {
 	})
 
 	// Create fake CO2 measurements (realistic values 400-2000 ppm)
-	fakeMeasurements := make([]int16, 108)
+	fakeMeasurements := make([]int16, 128)
 	for i := 0; i < 128; i++ {
 		// Simulate varying CO2 levels
 		base := 400 + (i * 10) // Start from 400 ppm
@@ -57,18 +57,12 @@ func main() {
 	time.Sleep(1 * time.Second)
 	log.Printf("Fake CO2 measurements: %v", fakeMeasurements)
 
-	// Clear display
-	display.ClearDisplay()
-
 	// Create plot
 	font := &proggy.TinySZ8pt7b
 	plot := miniplot.NewMiniPlot(&display, font, 128, 32)
 
 	// Draw plot at position (0, 0)
 	plot.DrawLineChart(fakeMeasurements)
-
-	// Update display
-	display.Display()
 
 	// Keep running to see the display
 	for {
