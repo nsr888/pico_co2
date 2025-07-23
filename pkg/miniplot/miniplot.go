@@ -91,3 +91,75 @@ func (mp *MiniPlot) drawData(data []int) {
 		tinydraw.FilledCircle(mp.display, x, y, 2, mp.Color)
 	}
 }
+package miniplot
+
+import (
+	"drivers"
+	"color"
+	"tinyfont"
+	"tinydraw"
+	"tinydraw"
+)
+
+type Plot struct {
+	display drivers.Displayer
+	color   color.RGBA
+	width   int16
+	height  int16
+}
+
+func NewPlot(display drivers.Displayer, c color.RGBA, width, height int16) *Plot {
+	if display == nil {
+		return nil
+	}
+	return &Plot{
+		display: display,
+		color:   c,
+		width:   width,
+		height:  height,
+	}
+}
+
+func (p *Plot) Draw(data []int16, x, y int16) {
+	if p == nil || len(data) == 0 {
+		return
+	}
+
+	// Calculate min and max values
+	minVal, maxVal := data[0], data[0]
+	for _, v := range data {
+		if v < minVal {
+			minVal = v
+		}
+		if v > maxVal {
+			maxVal = v
+		}
+	}
+
+	// Normalize data to fit in display height
+	range := maxVal - minVal
+	if range == 0 {
+		range = 1
+	}
+	
+	// Plot parameters
+	dotSize := 1
+	spacing := 2
+	startX := x
+	startY := y + p.height - dotSize // Start from bottom of plot area
+	
+	for i := 0; i < len(data) && i < p.width/spacing; i++ {
+		val := data[i]
+		normVal := (val - minVal) * p.height / range
+		
+		dotY := startY - normVal
+		dotX := startX + i * spacing
+		
+		if dotX >= p.width {
+			break
+		}
+		
+		// Draw dot
+		tinydraw.FilledCircle(p.display, dotX, dotY, dotSize, p.color)
+	}
+}
