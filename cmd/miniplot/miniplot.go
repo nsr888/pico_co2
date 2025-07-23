@@ -58,7 +58,7 @@ func main() {
 	display.ClearDisplay()
 
 	// Create plot
-	font := tinyfont.Fonter(&proggy.TinySZ8pt7b)
+	font := &proggy.TinySZ8pt7b
 	plot := miniplot.NewMiniPlot(&display, font, 128, 32)
 
 	// Draw plot at position (0, 0)

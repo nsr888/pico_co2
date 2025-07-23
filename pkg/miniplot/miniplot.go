@@ -55,17 +55,59 @@ func NewMiniPlot(
 }
 
 func (mp *MiniPlot) DrawLineChart(data []int16) error {
-	retrun nil
+	if len(data) == 0 {
+		return nil
+	}
+
+	// Find min and max values for scaling
+	minVal := data[0]
+	maxVal := data[0]
+	for _, v := range data {
+		if v < minVal {
+			minVal = v
+		}
+		if v > maxVal {
+			maxVal = v
+		}
+	}
+
+	// Clear display area
+	tinydraw.FilledRectangle(mp.display, 0, 0, mp.DisplayWidth, mp.DisplayHeight, color.RGBA{0, 0, 0, 255})
+
+	// Draw axes
+	mp.drawAxis(maxVal, minVal)
+	
+	// Draw data
+	mp.drawData(data, minVal, maxVal)
+	
+	return nil
 }
 
 func (mp *MiniPlot) drawText(x, y int16, text string) {
 	tinyfont.WriteLine(mp.display, mp.font, x, y, text, mp.Color)
 }
 
-// drawAxis draws the axis lines and labels for the plot.
-// It should draw values -100, -50 and 0 on the Y-axis,
-// and two labels on the X-axis: 0 and the maximum value of the data.
-func (mp *MiniPlot) drawAxis(maxValue int16) {
+func (mp *MiniPlot) drawAxis(maxValue, minValue int16) {
+	// Draw Y-axis line
+	tinydraw.Line(mp.display, 20, 0, 20, mp.DisplayHeight-1, mp.Color)
+	
+	// Draw X-axis line
+	tinydraw.Line(mp.display, 20, mp.DisplayHeight-1, mp.DisplayWidth-1, mp.DisplayHeight-1, mp.Color)
+
+	// Draw Y-axis labels
+	rangeVal := maxValue - minValue
+	if rangeVal == 0 {
+		rangeVal = 1
+	}
+	
+	label := mp.formatValue(minValue)
+	mp.drawText(0, mp.DisplayHeight-1-mp.fontHeight, label)
+	
+	label = mp.formatValue((maxValue+minValue)/2)
+	mp.drawText(0, mp.DisplayHeight/2, label)
+	
+	label = mp.formatValue(maxValue)
+	mp.drawText(0, 0, label)
 }
 
 // drawGrid draws a grid on the plot.
@@ -73,25 +115,41 @@ func (mp *MiniPlot) drawAxis(maxValue int16) {
 func (mp *MiniPlot) drawGrid() {
 }
 
-// drawData draws the data points on the plot.
-func (mp *MiniPlot) drawData(data []int16) {
-	// Calculate the scaling factor to fit the data into the display height.
-	maxValue := int16(0)
-	for _, value := range data {
-		if value > maxValue {
-			maxValue = value
-		}
+func (mp *MiniPlot) drawData(data []int16, minValue, maxValue int16) {
+	if len(data) == 0 {
+		return
 	}
 
-	if maxValue == 0 {
-		return // No data to draw
+	rangeVal := float64(maxValue - minValue)
+	if rangeVal == 0 {
+		rangeVal = 1
 	}
 
-	scaleFactor := float64(mp.DisplayHeight) / float64(maxValue)
+	// Calculate scaling factors
+	xScale := float64(mp.DisplayWidth-21) / float64(len(data)-1)
+	yScale := float64(mp.DisplayHeight-2) / rangeVal
 
+	// Draw line chart
+	prevX := int16(21)
+	prevY := int16(float64(maxValue-data[0]) * yScale)
+	
 	for i, value := range data {
-		x := int16(i)
-		y := int16(mp.DisplayHeight - int16(float64(value)*scaleFactor))
-		tinydraw.FilledCircle(mp.display, x, y, 2, mp.Color)
+		if i == 0 {
+			continue
+		}
+		
+		x := int16(21 + float64(i)*xScale)
+		y := int16(float64(maxValue-value) * yScale)
+		
+		tinydraw.Line(mp.display, prevX, prevY, x, y, mp.Color)
+		prevX, prevY = x, y
 	}
+}
+
+func (mp *MiniPlot) formatValue(value int16) string {
+	// Format value to fit in small space
+	if value >= 1000 {
+		return string(rune('0' + (value/1000)%10)) + "k"
+	}
+	return string(rune('0' + value%1000))
 }
