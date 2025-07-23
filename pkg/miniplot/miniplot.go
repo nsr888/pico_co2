@@ -54,6 +54,10 @@ func NewMiniPlot(
 	}
 }
 
+func (mp *MiniPlot) DrawLineChart(data []int16) error {
+	retrun nil
+}
+
 func (mp *MiniPlot) drawText(x, y int16, text string) {
 	tinyfont.WriteLine(mp.display, mp.font, x, y, text, mp.Color)
 }
@@ -61,7 +65,7 @@ func (mp *MiniPlot) drawText(x, y int16, text string) {
 // drawAxis draws the axis lines and labels for the plot.
 // It should draw values -100, -50 and 0 on the Y-axis,
 // and two labels on the X-axis: 0 and the maximum value of the data.
-func (mp *MiniPlot) drawAxis(maxValue int) {
+func (mp *MiniPlot) drawAxis(maxValue int16) {
 }
 
 // drawGrid draws a grid on the plot.
@@ -70,9 +74,9 @@ func (mp *MiniPlot) drawGrid() {
 }
 
 // drawData draws the data points on the plot.
-func (mp *MiniPlot) drawData(data []int) {
+func (mp *MiniPlot) drawData(data []int16) {
 	// Calculate the scaling factor to fit the data into the display height.
-	maxValue := 0
+	maxValue := int16(0)
 	for _, value := range data {
 		if value > maxValue {
 			maxValue = value
@@ -89,77 +93,5 @@ func (mp *MiniPlot) drawData(data []int) {
 		x := int16(i)
 		y := int16(mp.DisplayHeight - int16(float64(value)*scaleFactor))
 		tinydraw.FilledCircle(mp.display, x, y, 2, mp.Color)
-	}
-}
-package miniplot
-
-import (
-	"drivers"
-	"color"
-	"tinyfont"
-	"tinydraw"
-	"tinydraw"
-)
-
-type Plot struct {
-	display drivers.Displayer
-	color   color.RGBA
-	width   int16
-	height  int16
-}
-
-func NewPlot(display drivers.Displayer, c color.RGBA, width, height int16) *Plot {
-	if display == nil {
-		return nil
-	}
-	return &Plot{
-		display: display,
-		color:   c,
-		width:   width,
-		height:  height,
-	}
-}
-
-func (p *Plot) Draw(data []int16, x, y int16) {
-	if p == nil || len(data) == 0 {
-		return
-	}
-
-	// Calculate min and max values
-	minVal, maxVal := data[0], data[0]
-	for _, v := range data {
-		if v < minVal {
-			minVal = v
-		}
-		if v > maxVal {
-			maxVal = v
-		}
-	}
-
-	// Normalize data to fit in display height
-	range := maxVal - minVal
-	if range == 0 {
-		range = 1
-	}
-	
-	// Plot parameters
-	dotSize := 1
-	spacing := 2
-	startX := x
-	startY := y + p.height - dotSize // Start from bottom of plot area
-	
-	for i := 0; i < len(data) && i < p.width/spacing; i++ {
-		val := data[i]
-		normVal := (val - minVal) * p.height / range
-		
-		dotY := startY - normVal
-		dotX := startX + i * spacing
-		
-		if dotX >= p.width {
-			break
-		}
-		
-		// Draw dot
-		tinydraw.FilledCircle(p.display, dotX, dotY, dotSize, p.color)
 	}
 }
