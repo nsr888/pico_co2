@@ -2,29 +2,19 @@ package display
 
 import (
 	"image/color"
-	"log"
-
-	font "github.com/Nondzu/ssd1306_font"
-	"machine"
-	"tinygo.org/x/drivers/ssd1306"
 
 	"pico_co2/pkg/fifo"
 	"pico_co2/pkg/sparkline"
 )
 
-// Display Configuration
 const (
-	displayWidth   int16 = 128
-	displayHeight  int16 = 32
-	displayAddress       = ssd1306.Address_128_32
-	graphWidth     int16 = 60
-	graphHeight    int16 = 14
-	barWidth       int16 = 1
+	graphWidth  int16 = 128
+	graphHeight int16 = 14
+	barWidth    int16 = 1
 )
 
 type FontDisplay struct {
-	display      *ssd1306.Device
-	font         *font.Display
+	renderer     Renderer
 	clearDisplay func()
 	humFIFO      *fifo.FIFO16
 	sparkline    *sparkline.Sparkline
@@ -33,27 +23,32 @@ type FontDisplay struct {
 	height       int16
 }
 
-func NewFontDisplay(bus *machine.I2C) (*FontDisplay, error) {
-	display := ssd1306.NewI2C(bus)
-	display.Configure(ssd1306.Config{
-		Width:   displayWidth,
-		Height:  displayHeight,
-		Address: displayAddress,
-	})
-	log.Printf("Display configured: Width=%d, Height=%d, Address=%#x\n", displayWidth, displayHeight, displayAddress)
-
-	fontLib := font.NewDisplay(display)
-
-	var graphMeasurementsCount int16 = graphWidth / barWidth
+func NewFontDisplay(renderer Renderer) (*FontDisplay, error) {
+	var (
+		graphMeasurementsCount int16 = graphWidth / barWidth
+		white                        = color.RGBA{255, 255, 255, 255}
+		black                        = color.RGBA{0, 0, 0, 255}
+	)
+	displayWidth, displayHeight := renderer.Size()
 
 	return &FontDisplay{
-		font:         &fontLib,
-		clearDisplay: display.ClearDisplay,
-		display:      &display,
-		humFIFO:      fifo.NewFIFO16(int(graphMeasurementsCount)),
-		sparkline:    sparkline.NewSparkline(int(graphHeight)),
-		color:        color.RGBA{1, 1, 1, 255},
-		width:        displayWidth,
-		height:       displayHeight,
+		clearDisplay: func() {
+			for y := int16(0); y < displayHeight; y++ {
+				for x := int16(0); x < displayWidth; x++ {
+					renderer.SetPixel(x, y, black)
+				}
+			}
+		},
+		renderer:  renderer,
+		humFIFO:   fifo.NewFIFO16(int(graphMeasurementsCount)),
+		sparkline: sparkline.NewSparkline(int(graphHeight)),
+		color:     white,
+		width:     displayWidth,
+		height:    displayHeight,
 	}, nil
+}
+
+// Renderer returns the underlying renderer
+func (f *FontDisplay) Renderer() Renderer {
+	return f.renderer
 }

@@ -3,51 +3,54 @@ package display
 import (
 	"fmt"
 
-	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
+	"pico_co2/internal/types/status"
 )
 
-func (f *FontDisplay) DisplayReadingsWithHIAndStatus(r *types.Readings) {
-	if f == nil {
+func RenderHeatIndexStatus(renderer Renderer, r *types.Readings) {
+	if renderer == nil {
 		return
 	}
-	f.clearDisplay()
+	renderer.Clear()
+	var (
+		y int16
+		x int16
+	)
 
-	radiusFilled := int16(3)
+	width, _ := renderer.Size()
 
-	font7 := font.NewFont7(f.display)
-	font11 := font.NewFont11(f.display)
-	if r.ValidityError != "" {
-		font7.Print(0, 0, r.ValidityError)
+	x = 0
+	y = 0
+	if r.Warning != "" {
+		renderer.DrawSmallText(x, y, r.Warning)
 	} else {
-		// CO2Status
-		status := "CO2"
-		font7.Print(0, 0, status)
+		renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2 ", 0, 4)
 
-		f.DrawBar(30, 4, r.CO2Index(), radiusFilled)
-
-		// CO2 value
-		co2Value := fmt.Sprintf("%d", r.CO2)
-		var (
-			YPos int16 = 0
-			XPos       = int16(128 - (len(co2Value) * 11))
-		)
-		font11.Print(XPos, YPos, co2Value)
+		co2Value := fmt.Sprintf("%d", r.Raw.CO2)
+		renderer.DrawLargeText(int16(width-renderer.CalcLargeTextWidth(co2Value)), y, co2Value)
 	}
 
 	// Heat Index status
-	hiStatus := "HI"
-	font7.Print(0, 10, hiStatus)
+	x = 0
+	y = 11
+	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.HeatIndex), "HI  ", 0, 4)
 
-	f.DrawBar(30, 14, r.HeatIndexRating(), radiusFilled)
+	y = 22
+	humStr := fmt.Sprintf("%.0f", r.Raw.Humidity)
+	humWidth := renderer.CalcSmallTextWidth(humStr)
+	renderer.DrawSmallText(int16(width-humWidth), y, humStr)
+	tempStr := fmt.Sprintf("%.0f", r.Raw.Temperature)
+	tempWidth := renderer.CalcSmallTextWidth(tempStr)
+	renderer.DrawSmallText(int16(width-humWidth-tempWidth-5), y, tempStr)
 
-	tempHum := fmt.Sprintf("%.0f %.0f", r.Temperature, r.Humidity)
-	var (
-		YPos int16 = 16
-		XPos int16 = int16(128 - (len(tempHum) * 11))
+	status := status.ComfortStatus(
+		r.Raw.CO2,
+		r.Raw.AQI,
+		status.HeatIndex(r.Raw.Temperature, r.Raw.Humidity),
+		r.Raw.Humidity,
+		r.Raw.Temperature,
 	)
-	font11.Print(XPos, YPos, tempHum)
+	renderer.DrawSmallText(x, y, status)
 
-	status := r.ComfortStatus()
-	font7.Print(0, 20, status)
+	renderer.Display()
 }

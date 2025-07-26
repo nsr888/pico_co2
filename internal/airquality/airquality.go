@@ -6,5 +6,5 @@ import "pico_co2/internal/types"
 // provides environmental readings.
 type AirQualitySensor interface {
 	Configure() error
-	Read() (*types.Readings, error)
+	Read() (*types.ENSRawReadings, error)
 }

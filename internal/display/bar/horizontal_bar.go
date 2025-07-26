@@ -5,8 +5,7 @@ import (
 
 	"tinygo.org/x/drivers"
 	"tinygo.org/x/tinydraw"
-
-	"pico_co2/internal/display/font"
+	"tinygo.org/x/tinyfont"
 )
 
 type TwoSideBar struct {
@@ -17,7 +16,7 @@ type TwoSideBar struct {
 	color          color.RGBA
 	leftBarsCount  int16
 	rightBarsCount int16
-	font           font.FontPrinter
+	font           tinyfont.Fonter
 }
 
 func NewTwoSideBar(
@@ -26,14 +25,15 @@ func NewTwoSideBar(
 	barSpacing int16,
 	leftBarsCount int16,
 	rightBarsCount int16,
-	font font.FontPrinter,
+	font tinyfont.Fonter,
+	c color.RGBA,
 ) *TwoSideBar {
 	return &TwoSideBar{
 		display:        fd,
 		radiusFilled:   radiusFilled,
 		barSpacing:     barSpacing,
 		radiusEmpty:    1,
-		color:          color.RGBA{1, 1, 1, 255},
+		color:          c,
 		leftBarsCount:  leftBarsCount,
 		rightBarsCount: rightBarsCount,
 		font:           font,
@@ -121,7 +121,10 @@ func (cfg *TwoSideBar) drawTriangleDOWN(x, y int16) {
 }
 
 func (cfg *TwoSideBar) PrintText(x, y int16, label string) int16 {
-	fontHeight := cfg.font.Height()
-	y = y + cfg.radiusFilled + 1 - fontHeight/2
-	return cfg.font.Print(x, y, label)
+	fontHeight := int16(cfg.font.GetGlyph('A').Info().Height)
+	y = y + cfg.radiusFilled + 1 + fontHeight/2
+	tinyfont.WriteLine(cfg.display, cfg.font, x, y, label, cfg.color)
+	width, _ := tinyfont.LineWidth(cfg.font, label)
+
+	return int16(width)
 }

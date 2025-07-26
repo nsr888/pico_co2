@@ -21,6 +21,12 @@ This project is designed to measure CO2 levels, air quality, and other environme
 make flash
 ```
 
+## Generate all possible display themes
+
+```bash
+make test-displays
+```
+
 ## Case
 
 ![20250714_065327_](https://github.com/user-attachments/assets/1119b4b1-9fd0-45b7-aa6f-d544de5fbf7b)

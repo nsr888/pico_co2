@@ -1,25 +1,21 @@
-// Package fifo provides a fixed-size, no-allocation FIFO queue for int16 values on the stack.
+// Package fifo provides a fixed-size, no-allocation FIFO queue for int16 values.
 package fifo
-
-const MaxCapacity = 128 // maximum supported capacity
 
 // FIFO16 implements a circular buffer queue of int16 with runtime capacity up to MaxCapacity.
 type FIFO16 struct {
-	buf      [MaxCapacity]int16 // pre-allocated storage on the stack
-	capacity int                // actual usable capacity (≤ MaxCapacity)
-	head     int                // index of the oldest element
-	tail     int                // index to write the next element
-	count    int                // number of elements stored
+	buf      []int16
+	capacity int // actual usable capacity (≤ MaxCapacity)
+	head     int // index of the oldest element
+	tail     int // index to write the next element
+	count    int // number of elements stored
 }
 
-// NewFIFO16 creates a FIFO with the given capacity (1..MaxCapacity). No heap allocation.
+// NewFIFO16 creates a FIFO with the given capacity (1..MaxCapacity).
 func NewFIFO16(cap int) *FIFO16 {
-	if cap <= 0 {
-		cap = 1
-	} else if cap > MaxCapacity {
-		cap = MaxCapacity
+	return &FIFO16{
+		buf:      make([]int16, cap),
+		capacity: cap,
 	}
-	return &FIFO16{capacity: cap}
 }
 
 // Reset clears the queue back to empty state.
@@ -43,7 +39,6 @@ func (q *FIFO16) IsFull() bool {
 }
 
 // Enqueue adds v at the tail. If full, it drops the oldest to make space.
-// No allocations or pointers.
 func (q *FIFO16) Enqueue(v int16) {
 	if q.count == q.capacity {
 		// drop oldest
@@ -86,7 +81,7 @@ func (q *FIFO16) CopyTo() []int16 {
 }
 
 /*
-Usage example (no heap, everything on stack):
+Usage example:
 
 import (
     "fmt"
@@ -95,7 +90,6 @@ import (
 )
 
 func main() {
-    // create a queue of up to 64 samples (stack-allocated array)
     q := fifo.NewFIFO16(64)
 
     for {

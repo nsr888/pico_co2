@@ -1,6 +1,7 @@
 package airquality
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -39,7 +40,7 @@ func (a *ENS160AHT20Adapter) Configure() error {
 	a.aht20.Configure()
 
 	if err := a.ens160.Configure(); err != nil {
-		return fmt.Errorf("failed to configure ENS160: %w", err)
+		return errors.New("failed to configure ENS160: " + err.Error())
 	}
 
 	return nil
@@ -47,9 +48,9 @@ func (a *ENS160AHT20Adapter) Configure() error {
 
 // Read performs a sequential read: first the AHT20 to get temperature and
 // humidity, then the ENS160 using those values for compensation.
-func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
+func (a *ENS160AHT20Adapter) Read() (*types.ENSRawReadings, error) {
 	if err := a.aht20.Read(); err != nil {
-		return nil, fmt.Errorf("failed to read AHT20: %w", err)
+		return nil, errors.New("failed to read AHT20: " + err.Error())
 	}
 
 	temp := a.aht20.Celsius()
@@ -61,25 +62,26 @@ func (a *ENS160AHT20Adapter) Read() (*types.Readings, error) {
 
 	// Environmental compensation (ENS160)
 	if err := a.ens160.SetEnvDataMilli(tempMilliC, humidityMilliPct); err != nil {
-		return nil, fmt.Errorf("failed to set environment data for ENS160: %w", err)
+		return nil, errors.New("failed to set environmental data for ENS160: " + err.Error())
 	}
 
 	if err := a.ens160.Update(drivers.Concentration); err != nil {
-		return nil, fmt.Errorf("failed to read ENS160: %w", err)
+		return nil, errors.New("failed to update ENS160 readings: " + err.Error())
 	}
 
 	co2 := a.ens160.ECO2()
+	aqi := a.ens160.AQI()
+	tvoc := a.ens160.TVOC()
 	validity := a.ens160.Validity()
-	heatIndex := types.HeatIndex(temp, hum)
+	validityStr := a.ValidityError(validity)
 
-	return &types.Readings{
-		AQI:           a.ens160.AQI(),
-		Temperature:   temp,
-		Humidity:      hum,
-		CO2:           co2,
-		CO2Status:     CO2Status(co2),
-		ValidityError: a.ValidityError(validity),
-		HeatIndex:     heatIndex,
+	return &types.ENSRawReadings{
+		AQI:                 aqi,
+		Temperature:         temp,
+		Humidity:            hum,
+		CO2:                 co2,
+		TVOC:                tvoc,
+		DataValidityWarning: validityStr,
 	}, nil
 }
 
@@ -113,24 +115,5 @@ func (a *ENS160AHT20Adapter) ValidityError(validity uint8) string {
 		return "INVALID OUTPUT"
 	default:
 		return "UNKNOWN VALIDITY"
-	}
-}
-
-// CO2Status returns a human-readable status string based on the CO2
-// concentration value.
-func CO2Status(value uint16) string {
-	switch {
-	case value < 400:
-		return "No data"
-	case value < 600:
-		return "Excellent"
-	case value < 800:
-		return "Good"
-	case value < 1000:
-		return "Fair"
-	case value < 1500:
-		return "Poor"
-	default:
-		return "Bad"
 	}
 }

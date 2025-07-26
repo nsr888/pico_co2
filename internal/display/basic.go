@@ -2,27 +2,36 @@ package display
 
 import (
 	"fmt"
-	"strings"
 
-	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
 )
 
-func (f *FontDisplay) DisplayBasic(r *types.Readings) {
-	if f == nil {
+func RenderBasic(renderer Renderer, r *types.Readings) {
+	if renderer == nil {
 		return
 	}
-	f.clearDisplay()
 
-	errMsg := strings.Split(r.ValidityError, ": ")
+	renderer.Clear()
 
-	font7 := font.NewFont7(f.display)
+	width, _ := renderer.Size()
+	var space int16 = 8
 
-	f.printLines(errMsg[:1], font7)
+	if r.Warning != "" {
+		renderer.DrawSmallText(0, 0, r.Warning)
+	} else {
+		renderer.DrawXLargeText(0, 0, fmt.Sprintf("%s", r.Calculated.CO2Status))
+	}
 
-	humStr := fmt.Sprintf("H %.0f", r.Humidity)
-	font7.Print(int16(128-font7.CalcWidth(humStr)), 24, humStr)
+	humStr := fmt.Sprintf("H %.0f", r.Raw.Humidity)
+	humWidth := renderer.CalcSmallTextWidth(humStr)
+	renderer.DrawSmallText(width-humWidth, 24, humStr)
 
-	tempStr := fmt.Sprintf("T %.0f", r.Temperature)
-	font7.Print(int16(128-font7.CalcWidth(humStr)-font7.CalcWidth(tempStr)-8), 24, tempStr)
+	tempStr := fmt.Sprintf("T %.0f", r.Raw.Temperature)
+	tempWidth := renderer.CalcSmallTextWidth(tempStr)
+	renderer.DrawSmallText(width-tempWidth-space-humWidth, 24, tempStr)
+
+	co2Str := fmt.Sprintf("CO2 %d", r.Raw.CO2)
+	renderer.DrawSmallText(0, 24, co2Str)
+
+	renderer.Display()
 }

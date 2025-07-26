@@ -3,59 +3,37 @@ package display
 import (
 	"fmt"
 
-	"pico_co2/internal/display/bar"
-	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
+	"pico_co2/internal/types/status"
 )
 
-func (f *FontDisplay) DisplayBars(r *types.Readings) {
-	if f == nil {
+func RenderBars(renderer Renderer, r *types.Readings) {
+	if renderer == nil {
 		return
 	}
-	f.clearDisplay()
 
-	var (
-		lineY        int16 = 0
-		radiusFilled int16 = 3
-		barSpacing   int16 = 5
-	)
+	renderer.Clear()
 
-	font7 := font.NewFont7(f.display)
-	if font7 == nil {
-		return
-	}
-	hbarTop := bar.NewTwoSideBar(
-		f.display,
-		radiusFilled,
-		barSpacing,
-		0,
-		4,
-		font.NewFont7(f.display),
-	)
+	var lineY int16 = 0
 
-	if r.ValidityError != "" {
-		font7.Print(0, lineY, r.ValidityError)
+	if r.Warning != "" {
+		renderer.DrawSmallText(0, lineY, r.Warning)
 	} else {
-		x := hbarTop.Draw(0, lineY, r.CO2Index(), "C")
-		hbarTop.Draw(x+9, lineY, int16(r.AQI-1), "A")
+		renderer.DrawSmallText(0, lineY, fmt.Sprintf("AQI %d", r.Raw.AQI))
+		renderer.DrawTwoSideBar(36, lineY, int16(r.Calculated.CO2Status-1), "CO2", 0, 4)
+		co2 := fmt.Sprintf("%d", r.Raw.CO2)
+		renderer.DrawSmallText(128-renderer.CalcSmallTextWidth(co2), lineY, co2)
 	}
-
-	hbarBottom := bar.NewTwoSideBar(
-		f.display,
-		radiusFilled,
-		barSpacing,
-		3,
-		4,
-		font.NewFont7(f.display),
-	)
 
 	lineY = 11
-	hbarBottom.Draw(0, lineY, r.CalculateComfortIndex(), "TEM")
-	tem := fmt.Sprintf("%.0f", r.Temperature)
-	font7.Print(128-font7.CalcWidth(tem), lineY, tem)
+	renderer.DrawTwoSideBar(0, lineY, int16(status.CalculateComfortIndex(r.Raw.Temperature, r.Raw.Humidity)), "TEM", 3, 4)
+	tem := fmt.Sprintf("%.0f", r.Raw.Temperature)
+	renderer.DrawSmallText(128-renderer.CalcSmallTextWidth(tem), lineY, tem)
 
 	lineY = 22
-	hbarBottom.Draw(0, lineY, r.HumidityComfortIndex(), "HUM")
-	hum := fmt.Sprintf("%.0f", r.Humidity)
-	font7.Print(128-font7.CalcWidth(hum), lineY, hum)
+	renderer.DrawTwoSideBar(0, lineY, int16(status.HumidityComfortIndex(r.Raw.Humidity)), "HUM", 3, 4)
+	hum := fmt.Sprintf("%.0f", r.Raw.Humidity)
+	renderer.DrawSmallText(128-renderer.CalcSmallTextWidth(hum), lineY, hum)
+
+	renderer.Display()
 }

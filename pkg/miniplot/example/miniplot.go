@@ -1,11 +1,11 @@
 package main
 
 import (
+	"image/color"
 	"log"
 	"time"
 
 	"machine"
-
 	"tinygo.org/x/drivers/ssd1306"
 	"tinygo.org/x/tinyfont/proggy"
 
@@ -41,8 +41,9 @@ func main() {
 	})
 
 	// Create fake CO2 measurements (realistic values 400-2000 ppm)
-	fakeMeasurements := make([]int16, 128)
-	for i := 0; i < 128; i++ {
+	countMeasurements := 128 // Number of measurements to simulate
+	fakeMeasurements := make([]int16, countMeasurements)
+	for i := 0; i < len(fakeMeasurements); i++ {
 		// Simulate varying CO2 levels
 		base := 400 + (i * 10) // Start from 400 ppm
 		if i > 80 {
@@ -54,15 +55,19 @@ func main() {
 		fakeMeasurements[i] = int16(base)
 	}
 
-	time.Sleep(1 * time.Second)
-	log.Printf("Fake CO2 measurements: %v", fakeMeasurements)
+	time.Sleep(2 * time.Second)
 
 	// Create plot
 	font := &proggy.TinySZ8pt7b
-	plot := miniplot.NewMiniPlot(&display, font, 128, 32)
+	plot, err := miniplot.NewMiniPlot(&display, font, 128, 32, color.RGBA{255, 255, 255, 255})
+	if err != nil {
+		log.Fatalf("Failed to create MiniPlot: %v", err)
+	}
+
+	display.ClearDisplay()
 
 	// Draw plot at position (0, 0)
-	plot.DrawLineChart(fakeMeasurements)
+	plot.DrawLineChart(fakeMeasurements, "fake")
 
 	// Keep running to see the display
 	for {

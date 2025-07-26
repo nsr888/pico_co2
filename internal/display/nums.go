@@ -3,37 +3,35 @@ package display
 import (
 	"fmt"
 
-	font "github.com/Nondzu/ssd1306_font"
-
 	"pico_co2/internal/types"
 )
 
-func (f *FontDisplay) DisplayWithLargeCO2AndTempNums(r *types.Readings) {
-	if f == nil {
+func RenderNums(renderer Renderer, r *types.Readings) {
+	if renderer == nil {
 		return
 	}
-	f.clearDisplay()
+	renderer.Clear()
 
-	// Big numbers for eCO2 and temperature
-	f.font.Configure(font.Config{FontType: font.FONT_16x26})
-	f.font.XPos = 0
-	f.font.YPos = 0
-	f.font.PrintText(fmt.Sprintf("%d", r.CO2))
-	tempStr := fmt.Sprintf("%.0f", r.Temperature)
-	f.font.XPos = int16(128 - (len(tempStr) * 16))
-	f.font.YPos = 0
-	f.font.PrintText(tempStr)
+	width, _ := renderer.Size()
 
-	f.font.Configure(font.Config{FontType: font.FONT_6x8})
-	co2Str := "eCO2"
-	f.font.XPos = 0
-	f.font.YPos = 24
-	f.font.PrintText(co2Str)
-	tempTitleStr := "Temp"
-	f.font.XPos = int16(128 - (len(tempTitleStr) * 6))
-	f.font.YPos = 24
-	f.font.PrintText(tempTitleStr)
-	f.font.XPos = int16(128-(len(r.CO2Status)*6)) / 2
-	f.font.YPos = 24
-	f.font.PrintText(r.CO2Status)
+	renderer.DrawSmallText(0, 0, fmt.Sprintf("CO2: %s", r.Calculated.CO2Status))
+
+	renderer.DrawXLargeText(0, 8, fmt.Sprintf("%d", r.Raw.CO2))
+
+	tempStr := fmt.Sprintf("T %.0f", r.Raw.Temperature)
+	XPos := int16(width - (renderer.CalcSmallTextWidth(tempStr)))
+	YPos := int16(0)
+	renderer.DrawSmallText(XPos, YPos, tempStr)
+
+	humStr := fmt.Sprintf("H %.0f", r.Raw.Humidity)
+	XPos = int16(width - (renderer.CalcSmallTextWidth(humStr)))
+	YPos = int16(11)
+	renderer.DrawSmallText(XPos, YPos, humStr)
+
+	aqiStr := fmt.Sprintf("AQI %d", r.Raw.AQI)
+	XPos = int16(width - (renderer.CalcSmallTextWidth(aqiStr)))
+	YPos = int16(22)
+	renderer.DrawSmallText(XPos, YPos, aqiStr)
+
+	renderer.Display()
 }
