@@ -27,6 +27,40 @@ make flash
 make test-displays
 ```
 
+## Display Themes
+
+Below are examples of the different display themes available:
+
+### Basic Display
+![Basic Display](images/normal/basic.png)
+
+### Bar Display
+![Bar Display](images/normal/bars.png)
+
+### Bar Display with Large Numbers
+![Bar Display with Large Numbers](images/normal/bars_with_large_nums.png)
+
+### Large Bar Display
+![Large Bar Display](images/normal/large_bar.png)
+
+### Numbers Only Display
+![Numbers Only Display](images/normal/nums.png)
+
+### CO2 Graph Display
+![CO2 Graph Display](images/normal/co2_graph.png)
+
+### Temperature and Humidity Display
+![Temperature and Humidity Display](images/normal/temp_humid.png)
+
+### AQI Bar with Numbers Display
+![AQI Bar with Numbers Display](images/normal/aqi_bar_with_nums.png)
+
+### Heat Index Status Display
+![Heat Index Status Display](images/normal/render_heat_index_status.png)
+
+### Sparkline Display
+![Sparkline Display](images/normal/sparkline.png)
+
 ## Case
 
 ![20250714_065327_](https://github.com/user-attachments/assets/1119b4b1-9fd0-45b7-aa6f-d544de5fbf7b)
