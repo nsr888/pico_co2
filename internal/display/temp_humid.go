@@ -29,7 +29,7 @@ func RenderTempHumid(renderer Renderer, r *types.Readings) {
 	yPos = int16(8)
 	renderer.DrawXLargeText(xPos, yPos, temp)
 	// TODO: move to driver
-	DrawVerticalBar(renderer, tempWidth+4, yPos, int16(r.Calculated.CO2Status))
+	DrawVerticalBar(renderer, tempWidth+4, yPos, int16(r.Calculated.HeatIndex))
 
 	hum := fmt.Sprintf("%.0f", r.Raw.Humidity)
 	humWidth := renderer.CalcXLargeTextWidth(hum)

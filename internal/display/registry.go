@@ -1,6 +1,10 @@
 package display
 
-import "pico_co2/internal/types"
+import (
+	"sort"
+
+	"pico_co2/internal/types"
+)
 
 // DisplayMethod defines a type for the display method keys to improve type safety.
 type DisplayMethod string
@@ -36,4 +40,23 @@ var MethodRegistry = map[DisplayMethod]func(Renderer, *types.Readings){
 	Sparkline:         RenderSparkline,
 	LargeBar:          RenderLargeBar,
 	Nums:              RenderNums,
+}
+
+// GetAllDisplayMethods returns a sorted slice of all display methods
+func GetAllDisplayMethods() []DisplayMethod {
+	methods := make([]DisplayMethod, 0, len(MethodRegistry))
+
+	for method := range MethodRegistry {
+		// Exclude Error method as it's only for error conditions
+		if method != Error {
+			methods = append(methods, method)
+		}
+	}
+
+	// Sort alphabetically
+	sort.Slice(methods, func(i, j int) bool {
+		return methods[i] < methods[j]
+	})
+
+	return methods
 }

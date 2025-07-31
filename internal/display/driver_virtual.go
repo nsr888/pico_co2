@@ -268,7 +268,7 @@ func (v *VirtualDisplay) DrawSquareBar(x, y int16, value uint8) {
 	squareWidth := int16((128 - 6*3) / 4)
 	squareHeight := int16(9)
 	totalCount := 4
-	filledCount := int16(value - 1)
+	filledCount := int16(value)
 
 	for range totalCount {
 		if filledCount > 0 {

@@ -32,8 +32,9 @@ const (
 )
 
 type App struct {
-	renderer         display.Renderer
-	airqualitySensor airquality.AirQualitySensor
+	renderer            display.Renderer
+	airqualitySensor    airquality.AirQualitySensor
+	currentDisplayIndex int
 }
 
 func New() (*App, error) {
@@ -77,7 +78,9 @@ func (a *App) Run() {
 	wd.Start()
 	println("starting loop")
 
-	var isDisplayGraph bool
+	// Get all display methods for cycling
+	displayMethods := display.GetAllDisplayMethods()
+
 	for {
 		readings, err := a.airqualitySensor.Read()
 		if err != nil {
@@ -106,13 +109,17 @@ func (a *App) Run() {
 			display.RenderTempHumid(a.renderer, r)
 			waitNextSample(shortTimeout)
 		} else {
-			switch isDisplayGraph {
-			case false:
-				display.RenderAqiBarWithNums(a.renderer, r)
-			case true:
-				display.RenderCO2Graph(a.renderer, r)
+			// Cycle through all display methods
+			currentMethod := displayMethods[a.currentDisplayIndex]
+			if renderFunc, exists := display.MethodRegistry[currentMethod]; exists {
+				renderFunc(a.renderer, r)
+			} else {
+				// Fallback to basic display if method not found
+				display.RenderBasic(a.renderer, r)
 			}
-			isDisplayGraph = !isDisplayGraph
+
+			// Move to next display method
+			a.currentDisplayIndex = (a.currentDisplayIndex + 1) % len(displayMethods)
 			waitNextSample(minuteTimeout)
 		}
 	}
