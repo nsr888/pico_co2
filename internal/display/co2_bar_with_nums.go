@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"pico_co2/internal/types"
-	"pico_co2/internal/types/status"
 )
 
-func RenderAqiBarWithNums(renderer Renderer, r *types.Readings) {
+func RenderCO2BarWithNums(renderer Renderer, r *types.Readings) {
 	if renderer == nil {
 		return
 	}
@@ -25,16 +24,12 @@ func RenderAqiBarWithNums(renderer Renderer, r *types.Readings) {
 
 	x = 0
 	y = 11
-	humidityComfortIndex := status.HumidityComfortIndex(r.Raw.Humidity)
-	renderer.DrawTwoSideBar(x, y, humidityComfortIndex, "HUMID ", 0, 4)
+	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2   ", 0, 4)
 
 	x = 0
 	y = 22
-	if r.Warning != "" {
-		renderer.DrawSmallText(x, y, r.Warning)
-	} else {
-		renderer.DrawTwoSideBar(x, y, int16(r.Raw.AQI-1), "AQI   ", 0, 4)
-	}
+	co2Str := fmt.Sprintf("       %d", r.Raw.CO2)
+	renderer.DrawSmallText(x, y, co2Str)
 
 	temp := fmt.Sprintf("%.0f", r.Raw.Temperature)
 	x = 128 - renderer.CalcLargeTextWidth(temp)

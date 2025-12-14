@@ -16,11 +16,7 @@ func RenderBasic(renderer Renderer, r *types.Readings) {
 	width, _ := renderer.Size()
 	var space int16 = 8
 
-	if r.Warning != "" {
-		renderer.DrawSmallText(0, 0, r.Warning)
-	} else {
-		renderer.DrawXLargeText(0, 0, fmt.Sprintf("%s", r.Calculated.CO2Status))
-	}
+	renderer.DrawXLargeText(0, 0, fmt.Sprintf("%s", r.Calculated.CO2Status))
 
 	humStr := fmt.Sprintf("H %.0f", r.Raw.Humidity)
 	humWidth := renderer.CalcSmallTextWidth(humStr)

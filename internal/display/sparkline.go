@@ -20,20 +20,16 @@ func RenderSparkline(renderer Renderer, r *types.Readings) {
 	x = 0
 	y = 0
 
-	if r.Warning != "" {
-		renderer.DrawSmallText(x, y, r.Warning)
-	} else {
-		renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2", 0, 4)
+	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2", 0, 4)
 
-		humStr := fmt.Sprintf("H %.0f", r.Raw.Humidity)
-		humWidth := renderer.CalcSmallTextWidth(humStr)
-		width, _ := renderer.Size()
-		renderer.DrawSmallText(width-humWidth, 0, humStr)
+	humStr := fmt.Sprintf("H %.0f", r.Raw.Humidity)
+	humWidth := renderer.CalcSmallTextWidth(humStr)
+	width, _ := renderer.Size()
+	renderer.DrawSmallText(width-humWidth, 0, humStr)
 
-		tempStr := fmt.Sprintf("T %.0f", r.Raw.Temperature)
-		tempWidth := renderer.CalcSmallTextWidth(tempStr)
-		renderer.DrawSmallText(width-tempWidth-humWidth-8, 0, tempStr)
-	}
+	tempStr := fmt.Sprintf("T %.0f", r.Raw.Temperature)
+	tempWidth := renderer.CalcSmallTextWidth(tempStr)
+	renderer.DrawSmallText(width-tempWidth-humWidth-8, 0, tempStr)
 
 	x = 0
 	y = 11

@@ -32,17 +32,12 @@ func main() {
 		testReadings.CO2History.AddedAt = testReadings.FirstReadingTime.Add(-2 * time.Minute)
 		// use formula to generate graph data with increasing and decreasing values
 		co2 := simulateSensor(uint8(i))
-		tvoc := 348 + i
-		aqi := 1 + i%5
 		temperature := 22.5 + float64(i)/10.0
 		humidity := 45.0 + float64(i)/10.0
 		testReadings.AddReadings(
 			uint16(co2),
-			uint16(tvoc),
-			uint8(aqi),
 			float32(temperature),
 			float32(humidity),
-			"",
 		)
 	}
 

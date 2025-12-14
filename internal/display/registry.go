@@ -1,8 +1,6 @@
 package display
 
 import (
-	"sort"
-
 	"pico_co2/internal/types"
 )
 
@@ -29,17 +27,17 @@ func (d DisplayMethod) String() string {
 }
 
 var MethodRegistry = map[DisplayMethod]func(Renderer, *types.Readings){
-	AqiBarWithNums:    RenderAqiBarWithNums,
-	TempHumid:         RenderTempHumid,
-	Error:             RenderError,
-	Basic:             RenderBasic,
-	CO2Graph:          RenderCO2Graph,
+	AqiBarWithNums:    RenderCO2BarWithNums,
 	Bars:              RenderBars,
 	BarsWithLargeNums: RenderBarsWithLargeNums,
+	Basic:             RenderBasic,
+	CO2Graph:          RenderCO2Graph,
+	Error:             RenderError,
 	HeatIndexStatus:   RenderHeatIndexStatus,
-	Sparkline:         RenderSparkline,
 	LargeBar:          RenderLargeBar,
 	Nums:              RenderNums,
+	Sparkline:         RenderSparkline,
+	TempHumid:         RenderTempHumid,
 }
 
 // GetAllDisplayMethods returns a sorted slice of all display methods
@@ -47,16 +45,10 @@ func GetAllDisplayMethods() []DisplayMethod {
 	methods := make([]DisplayMethod, 0, len(MethodRegistry))
 
 	for method := range MethodRegistry {
-		// Exclude Error method as it's only for error conditions
 		if method != Error {
 			methods = append(methods, method)
 		}
 	}
-
-	// Sort alphabetically
-	sort.Slice(methods, func(i, j int) bool {
-		return methods[i] < methods[j]
-	})
 
 	return methods
 }

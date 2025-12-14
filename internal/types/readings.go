@@ -1,10 +1,9 @@
 package types
 
 import (
-	"time"
-
 	"pico_co2/internal/types/status"
 	"pico_co2/pkg/fifo"
+	"time"
 )
 
 type Readings struct {
@@ -48,18 +47,13 @@ func InitReadings(queueSize int) *Readings {
 
 func (r *Readings) AddReadings(
 	co2 uint16,
-	tvoc uint16,
-	aqi uint8,
 	temperature float32,
 	humidity float32,
-	warning string,
 ) {
-	// Initialize the first reading time if not set
 	if r.FirstReadingTime.IsZero() {
 		r.FirstReadingTime = time.Now()
 	}
 
-	// Update CO2 history if measurements are initialized
 	if r.CO2History.Measurements == nil {
 		return
 	}
@@ -69,18 +63,12 @@ func (r *Readings) AddReadings(
 		r.CO2History.AddedAt = time.Now()
 	}
 
-	// Calculate derived readings
 	heatIndex := status.HeatIndex(temperature, humidity)
 	r.Calculated.HeatIndex = status.ToHeatIndexStatus(heatIndex)
 	r.Calculated.CO2Status = status.ToCO2Index(co2)
 
-	r.Warning = warning
-
-	// Update the readings
 	r.Raw = RawReadings{
 		CO2:         co2,
-		TVOC:        tvoc,
-		AQI:         aqi,
 		Temperature: temperature,
 		Humidity:    humidity,
 	}

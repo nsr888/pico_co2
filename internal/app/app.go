@@ -3,14 +3,16 @@ package app
 import (
 	"errors"
 	"fmt"
-	"time"
-
 	"machine"
-	"tinygo.org/x/drivers/ssd1306"
-
-	"pico_co2/internal/airquality"
+	"pico_co2/internal/button"
 	"pico_co2/internal/display"
 	"pico_co2/internal/types"
+	"pico_co2/pkg/ens160"
+	"time"
+
+	"tinygo.org/x/drivers/aht20"
+	"tinygo.org/x/drivers/scd4x"
+	"tinygo.org/x/drivers/ssd1306"
 )
 
 // Application Logic
@@ -22,6 +24,8 @@ const (
 	i2cFrequency   = 400 * machine.KHz
 	i2cSDA         = machine.GP4
 	i2cSCL         = machine.GP5
+	button1Pin     = machine.GP10
+	button2Pin     = machine.GP11
 )
 
 const (
@@ -33,8 +37,12 @@ const (
 
 type App struct {
 	renderer            display.Renderer
-	airqualitySensor    airquality.AirQualitySensor
+	aht20Sensor         *aht20.Device
+	ens160Sensor        *ens160.Device
+	scd4xSensor         *scd4x.Device
 	currentDisplayIndex int
+	button1             *button.TouchButton
+	button2             *button.TouchButton
 }
 
 func New() (*App, error) {
@@ -52,17 +60,57 @@ func New() (*App, error) {
 		Height:  displayHeight,
 		Address: displayAddress,
 	})
+	// reduce contrast for night time viewing
+	ssd1306disp.Command(ssd1306.SETCONTRAST)
+	ssd1306disp.Command(0x01)
 
 	renderer := display.NewSSD1306Adapter(&ssd1306disp)
 
-	airQualitySensor := airquality.NewENS160AHT20Adapter(machine.I2C0)
-	if err := airQualitySensor.Configure(); err != nil {
-		return nil, errors.New("failed to configure air quality sensor: " + err.Error())
+	aht20Sensor := aht20.New(machine.I2C0)
+	aht20Sensor.Reset()
+	aht20Sensor.Configure()
+	ens160Sensor := ens160.New(machine.I2C0, ens160.DefaultAddress)
+	if err := ens160Sensor.Sleep(); err != nil {
+		return nil, errors.New("failed to put ENS160 to sleep: " + err.Error())
 	}
 
+	scd4xSensor := scd4x.New(machine.I2C0)
+	time.Sleep(1500 * time.Millisecond)
+	if err := scd4xSensor.Configure(); err != nil {
+		return nil, errors.New("failed to configure SCD4x: " + err.Error())
+	}
+
+	time.Sleep(1500 * time.Millisecond)
+
+	if err := scd4xSensor.StartPeriodicMeasurement(); err != nil {
+		return nil, errors.New(
+			"failed to start SCD4x periodic measurement: " + err.Error(),
+		)
+	}
+
+	time.Sleep(1500 * time.Millisecond)
+
+	button1 := button.NewTouchButton(button1Pin)
+	button2 := button.NewTouchButton(button2Pin)
+
 	return &App{
-		renderer:         renderer,
-		airqualitySensor: airQualitySensor,
+		renderer:     renderer,
+		aht20Sensor:  &aht20Sensor,
+		ens160Sensor: ens160Sensor,
+		scd4xSensor:  scd4xSensor,
+		button1:      button1,
+		button2:      button2,
+		// Display method 0 : co2_bar_with_nums
+		// Display method 1 : bars
+		// Display method 2 : basic
+		// Display method 3 : temp_humid
+		// Display method 4 : bars_with_large_nums
+		// Display method 5 : co2_graph
+		// Display method 6 : render_heat_index_status
+		// Display method 7 : large_bar
+		// Display method 8 : nums
+		// Display method 9 : sparkline
+		currentDisplayIndex: 3,
 	}, nil
 }
 
@@ -71,67 +119,84 @@ func (a *App) Run() {
 	r := types.InitReadings(queueCapacity)
 
 	wd := machine.Watchdog
-	config := machine.WatchdogConfig{
+	wd.Configure(machine.WatchdogConfig{
 		TimeoutMillis: watchDogMillis,
-	}
-	wd.Configure(config)
+	})
 	wd.Start()
 	println("starting loop")
 
-	// Get all display methods for cycling
 	displayMethods := display.GetAllDisplayMethods()
 
-	for {
-		readings, err := a.airqualitySensor.Read()
-		if err != nil {
-			println("error reading air quality sensor:", err)
-			readings := types.Readings{
-				Error: err.Error(),
-			}
-			display.RenderError(a.renderer, &readings)
+	for i, method := range displayMethods {
+		println("Display method", i, ":", method)
+	}
 
+	lastSampleTime := time.Now()
+	displayDirty := true // Render on the first loop iteration
+
+	readAndRecord := func() {
+		lastSampleTime = time.Now()
+		errAht := a.aht20Sensor.Read()
+		if errAht != nil {
+			r.Error = "AHT20 read error: " + errAht.Error()
+			displayDirty = true
 			return
 		}
-
-		fmt.Printf("Readings: %+v\n", readings)
-
-		r.AddReadings(
-			readings.CO2,
-			readings.TVOC,
-			readings.AQI,
-			readings.Temperature,
-			readings.Humidity,
-			readings.DataValidityWarning,
-		)
-
-		// on startup, wait shorter to get updates quickly
-		if time.Since(r.FirstReadingTime) < startupTimeout {
-			display.RenderTempHumid(a.renderer, r)
-			waitNextSample(shortTimeout)
-		} else {
-			// Cycle through all display methods
-			currentMethod := displayMethods[a.currentDisplayIndex]
-			if renderFunc, exists := display.MethodRegistry[currentMethod]; exists {
-				renderFunc(a.renderer, r)
-			} else {
-				// Fallback to basic display if method not found
-				display.RenderBasic(a.renderer, r)
-			}
-
-			// Move to next display method
-			a.currentDisplayIndex = (a.currentDisplayIndex + 1) % len(displayMethods)
-			waitNextSample(minuteTimeout)
+		temp := a.aht20Sensor.Celsius()
+		hum := a.aht20Sensor.RelHumidity()
+		co2, err := a.scd4xSensor.ReadCO2()
+		if err != nil {
+			r.Error = "SCD4x read error: " + err.Error()
+			displayDirty = true
+			return
 		}
+		fmt.Printf(
+			"CO2: %d ppm, Temp: %.2f °C, Humidity: %.2f %%\n",
+			co2,
+			temp,
+			hum,
+		)
+		r.AddReadings(uint16(co2), temp, hum)
+		r.Error = ""
+		displayDirty = true // Flag that the display needs to be updated.
 	}
-}
 
-// waitNextSample pauses execution for a given number of seconds
-// while periodically updating the watchdog.
-func waitNextSample(timeout time.Duration) {
-	seconds := int(timeout.Seconds())
-	wd := machine.Watchdog
-	for i := 0; i < seconds; i++ {
+	// Initial sensor read.
+	readAndRecord()
+
+	for {
 		wd.Update()
-		time.Sleep(time.Second)
+
+		// Button 1 press changes the display method and flags a re-render.
+		if a.button1.Consume() {
+			a.currentDisplayIndex = (a.currentDisplayIndex + 1) % len(
+				displayMethods,
+			)
+			displayDirty = true
+		}
+
+		button2Pressed := a.button2.Consume()
+
+		// New sensor data is read on a schedule or when button 2 is pressed.
+		if time.Since(lastSampleTime) >= minuteTimeout || button2Pressed {
+			readAndRecord()
+		}
+
+		// Re-render the display only if something has changed.
+		if displayDirty {
+			if r.Error != "" {
+				display.RenderError(a.renderer, r)
+			} else {
+				currentMethod := displayMethods[a.currentDisplayIndex]
+				if renderFunc, exists := display.MethodRegistry[currentMethod]; exists {
+					renderFunc(a.renderer, r)
+				} else {
+					display.RenderBasic(a.renderer, r)
+				}
+			}
+			displayDirty = false // Reset the flag until the next change.
+		}
+
+		time.Sleep(50 * time.Millisecond)
 	}
 }

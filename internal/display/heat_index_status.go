@@ -21,14 +21,10 @@ func RenderHeatIndexStatus(renderer Renderer, r *types.Readings) {
 
 	x = 0
 	y = 0
-	if r.Warning != "" {
-		renderer.DrawSmallText(x, y, r.Warning)
-	} else {
-		renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2 ", 0, 4)
+	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2 ", 0, 4)
 
-		co2Value := fmt.Sprintf("%d", r.Raw.CO2)
-		renderer.DrawLargeText(int16(width-renderer.CalcLargeTextWidth(co2Value)), y, co2Value)
-	}
+	co2Value := fmt.Sprintf("%d", r.Raw.CO2)
+	renderer.DrawLargeText(int16(width-renderer.CalcLargeTextWidth(co2Value)), y, co2Value)
 
 	// Heat Index status
 	x = 0

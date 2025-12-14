@@ -25,9 +25,6 @@ func RenderLargeBar(renderer Renderer, r *types.Readings) {
 	renderer.DrawSquareBar(XPos, YPos, uint8(r.Calculated.CO2Status))
 
 	co2Str := fmt.Sprintf("CO2 %d", r.Raw.CO2)
-	if r.Warning != "" {
-		co2Str = r.Warning
-	}
 	XPos = 0
 	YPos = 24
 	renderer.DrawSmallText(XPos, YPos, co2Str)

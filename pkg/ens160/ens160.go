@@ -166,6 +166,30 @@ func (d *Device) Validity() uint8 {
 	return d.lastValidity
 }
 
+// Sleep puts the device into deep sleep mode to minimize power consumption
+// and self-heating.
+func (d *Device) Sleep() error {
+	return d.write1(regOpMode, ModeDeepSleep)
+}
+
+// Wake sets the device to idle mode. From here you can set it to standard mode
+// when ready to take measurements.
+func (d *Device) Wake() error {
+	if err := d.write1(regOpMode, ModeIdle); err != nil {
+		return err
+	}
+	time.Sleep(defaultTimeout)
+	return nil
+}
+
+// EnableMeasurements sets the device to standard measurement mode.
+func (d *Device) EnableMeasurements() error {
+	if err := d.write1(regOpMode, ModeStandard); err != nil {
+		return err
+	}
+	time.Sleep(longTimeout)
+	return nil
+}
 // write1 writes a single byte to a register.
 func (d *Device) write1(reg, val uint8) error {
 	d.wbuf[0] = reg
