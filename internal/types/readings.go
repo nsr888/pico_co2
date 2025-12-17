@@ -37,8 +37,9 @@ type MeasurementHistory struct {
 }
 
 type CalculatedReadings struct {
-	HeatIndex status.HeatIndexStatus `json:"heat_index,omitempty"`
-	CO2Status status.CO2Index        `json:"eco2_human,omitempty"`
+	HeatIndex       status.HeatIndexStatus `json:"heat_index,omitempty"`
+	CO2Status       status.CO2Index        `json:"eco2_human,omitempty"`
+	CO215MinAverage uint16                 `json:"co2_15min_average,omitempty"`
 }
 
 func InitReadings(queueSize int) *Readings {
@@ -78,6 +79,29 @@ func (r *Readings) AddReadings(
 	heatIndex := status.HeatIndex(temperature, humidity)
 	r.Calculated.HeatIndex = status.ToHeatIndexStatus(heatIndex)
 	r.Calculated.CO2Status = status.ToCO2Index(co2)
+
+	// Calculate 15-minute average of last 15 readings
+	if r.History.CO2.Len() >= 15 {
+		var sum uint32
+		count := 0
+
+		r.History.CO2.PeekAll(func(val int16) {
+			sum += uint32(val)
+			count++
+			if count >= 15 {
+				return
+			}
+		})
+
+		if count > 0 {
+			r.Calculated.CO215MinAverage = uint16(sum / uint32(count))
+		}
+	} else {
+		// Not enough data yet, use current reading as initial average
+		if r.Calculated.CO215MinAverage == 0 {
+			r.Calculated.CO215MinAverage = co2
+		}
+	}
 
 	// Store last measurements before updating with new ones
 	r.LastRaw = r.Raw
