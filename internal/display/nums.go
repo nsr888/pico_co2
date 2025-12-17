@@ -12,26 +12,34 @@ func RenderNums(renderer Renderer, r *types.Readings) {
 	}
 	renderer.Clear()
 
-	width, _ := renderer.Size()
+	var (
+		y int16
+		x int16
+	)
 
-	renderer.DrawSmallText(0, 0, fmt.Sprintf("CO2: %s", r.Calculated.CO2Status))
+	renderer.DrawSmallText(x, y, fmt.Sprintf("CO2: %s", r.Calculated.CO2Status))
 
-	renderer.DrawXLargeText(0, 8, fmt.Sprintf("%d", r.Raw.CO2))
+	x = 0
+	y = 8
+	renderer.DrawXLargeText(x, y, fmt.Sprintf("%d", r.Raw.CO2))
 
-	tempStr := fmt.Sprintf("T %.0f", r.Raw.Temperature)
-	XPos := int16(width - (renderer.CalcSmallTextWidth(tempStr)))
-	YPos := int16(0)
-	renderer.DrawSmallText(XPos, YPos, tempStr)
+	x = 90
+	y = 0
+	renderer.DrawSmallText(x, y, "T")
 
-	humStr := fmt.Sprintf("H %.0f", r.Raw.Humidity)
-	XPos = int16(width - (renderer.CalcSmallTextWidth(humStr)))
-	YPos = int16(11)
-	renderer.DrawSmallText(XPos, YPos, humStr)
+	temp := fmt.Sprintf("%.0f", r.Raw.Temperature)
+	x = 128 - renderer.CalcLargeTextWidth(temp)
+	y = 0
+	renderer.DrawLargeText(x, y, temp)
 
-	aqiStr := fmt.Sprintf("AQI %d", r.Raw.AQI)
-	XPos = int16(width - (renderer.CalcSmallTextWidth(aqiStr)))
-	YPos = int16(22)
-	renderer.DrawSmallText(XPos, YPos, aqiStr)
+	x = 90
+	y = 16
+	renderer.DrawSmallText(x, y, "H")
+
+	hum := fmt.Sprintf("%.0f", r.Raw.Humidity)
+	x = 128 - renderer.CalcLargeTextWidth(hum)
+	y = 16
+	renderer.DrawLargeText(x, y, hum)
 
 	renderer.Display()
 }

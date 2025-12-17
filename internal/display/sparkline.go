@@ -37,7 +37,7 @@ func RenderSparkline(renderer Renderer, r *types.Readings) {
 	var graphHeight int16 = 21
 	var graphWidth int16 = 128
 
-	data := r.CO2History.Measurements.CopyTo()
+	data := r.History.CO2.CopyTo()
 	renderer.DrawSparkline(x, y, data, graphWidth, graphHeight)
 
 	renderer.Display()

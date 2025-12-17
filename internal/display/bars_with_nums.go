@@ -23,24 +23,24 @@ func RenderBarsWithLargeNums(renderer Renderer, r *types.Readings) {
 	x = 0
 	y = 0
 	// Print first line with CO2 and AQI
-	x = renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "C", 0, 4)
-	renderer.DrawTwoSideBar(x+barSpacing, y, int16(status.CalculateComfortIndex(r.Raw.Temperature, r.Raw.Humidity)), "T", 0, 4)
+	x = renderer.DrawTwoSideBar(x, y, int16(status.CalculateComfortIndex(r.Raw.Temperature, r.Raw.Humidity)), "T", 0, 4)
+	renderer.DrawTwoSideBar(x+barSpacing, y, int16(r.Calculated.CO2Status), "C", 0, 4)
 
 	x = 0
 	y = 16
-	// Print CO2 value
-	co2 := fmt.Sprintf("%d", r.Raw.CO2)
-	renderer.DrawLargeText(x, y, co2)
+	// Print temperature
+	temp := fmt.Sprintf("%.0f", r.Raw.Temperature)
+	renderer.DrawLargeSansText(x, y, temp)
 
 	// Print humidity
 	hum := fmt.Sprintf("%.0f", r.Raw.Humidity)
-	x = 128 - renderer.CalcLargeTextWidth(hum)
-	renderer.DrawLargeText(x, y, hum)
+	x = int16(x + 10 + renderer.CalcLargeSansTextWidth(temp))
+	renderer.DrawLargeSansText(x, y, hum)
 
-	// Print temperature
-	temp := fmt.Sprintf("%.0f", r.Raw.Temperature)
-	x = int16(x - 10 - renderer.CalcLargeTextWidth(temp))
-	renderer.DrawLargeText(x, y, temp)
+	// Print CO2 value
+	co2 := fmt.Sprintf("%d", r.Raw.CO2)
+	x = 128 - renderer.CalcLargeTextWidth(co2)
+	renderer.DrawLargeSansText(x, y, co2)
 
 	renderer.Display()
 }

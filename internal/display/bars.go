@@ -16,7 +16,6 @@ func RenderBars(renderer Renderer, r *types.Readings) {
 
 	var lineY int16 = 0
 
-	renderer.DrawSmallText(0, lineY, fmt.Sprintf("AQI %d", r.Raw.AQI))
 	renderer.DrawTwoSideBar(36, lineY, int16(r.Calculated.CO2Status), "CO2", 0, 4)
 	co2 := fmt.Sprintf("%d", r.Raw.CO2)
 	renderer.DrawSmallText(128-renderer.CalcSmallTextWidth(co2), lineY, co2)

@@ -10,7 +10,11 @@ type Renderer interface {
 	DrawXLargeText(x, y int16, text string)
 	CalcXLargeTextWidth(text string) int16
 	DrawLargeText(x, y int16, text string)
+	DrawLargeBoldText(x, y int16, text string)
+	DrawLargeSansText(x, y int16, text string)
 	CalcLargeTextWidth(text string) int16
+	CalcLargeBoldTextWidth(text string) int16
+	CalcLargeSansTextWidth(text string) int16
 	DrawSmallText(x, y int16, text string)
 	CalcSmallTextWidth(text string) int16
 	DrawLongText(x, y int16, text string)

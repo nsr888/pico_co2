@@ -25,11 +25,11 @@ func main() {
 	vd := display.NewVirtualDisplay(displayWidth, displayHeight)
 
 	testReadings := types.InitReadings(queueCapacity)
-	testReadings.FirstReadingTime = testReadings.FirstReadingTime.Add(-3 * time.Minute)
+	testReadings.FirstReadingAt = testReadings.FirstReadingAt.Add(-3 * time.Minute)
 
 	countMeasurements := queueCapacity
-	for i := 0; i < countMeasurements; i++ {
-		testReadings.CO2History.AddedAt = testReadings.FirstReadingTime.Add(-2 * time.Minute)
+	for i := range countMeasurements {
+		testReadings.History.AddedAt = testReadings.FirstReadingAt.Add(-2 * time.Minute)
 		// use formula to generate graph data with increasing and decreasing values
 		co2 := simulateSensor(uint8(i))
 		temperature := 22.5 + float64(i)/10.0
@@ -74,10 +74,10 @@ func main() {
 
 	for _, tc := range testCases {
 		vd.Clear()
-		for key, renderMethod := range display.MethodRegistry {
+		for _, method := range display.MethodRegistry {
 			os.MkdirAll("images/"+tc.name, 0755)
-			renderMethod(vd, tc.readings(testReadings))
-			vd.SavePNG("images/" + tc.name + "/" + key.String() + ".png")
+			method.Fn(vd, tc.readings(testReadings))
+			vd.SavePNG("images/" + tc.name + "/" + method.Name + ".png")
 		}
 	}
 }

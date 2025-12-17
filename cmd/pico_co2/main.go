@@ -5,9 +5,11 @@ import (
 )
 
 func main() {
-	application, err := app.New()
+	cfg := app.DefaultConfig()
+	application, err := app.New(cfg)
 	if err != nil {
 		println("error creating application:", err)
+		return
 	}
 
 	application.Run()

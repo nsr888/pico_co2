@@ -7,6 +7,7 @@ import (
 	"tinygo.org/x/tinydraw"
 	"tinygo.org/x/tinyfont"
 	"tinygo.org/x/tinyfont/freemono"
+	"tinygo.org/x/tinyfont/freesans"
 	"tinygo.org/x/tinyfont/proggy"
 
 	"pico_co2/internal/display/bar"
@@ -39,8 +40,8 @@ func (v *SSD1306Adapter) Size() (int16, int16) {
 
 func (v *SSD1306Adapter) Clear() {
 	width, height := v.dev.Size()
-	for x := int16(0); x < width; x++ {
-		for y := int16(0); y < height; y++ {
+	for x := range width {
+		for y := range height {
 			v.dev.SetPixel(x, y, v.black)
 		}
 	}
@@ -74,8 +75,42 @@ func (v *SSD1306Adapter) DrawLargeText(x, y int16, text string) {
 	tinyfont.WriteLine(v, font, x, y, text, v.white)
 }
 
+func (v *SSD1306Adapter) DrawLargeBoldText(x, y int16, text string) {
+	font := &freemono.Bold12pt7b
+	y += int16(font.GetGlyph('0').Info().Height)
+	tinyfont.WriteLine(v, font, x, y, text, v.white)
+}
+
+func (v *SSD1306Adapter) DrawLargeSansText(x, y int16, text string) {
+	font := &freesans.Regular12pt7b
+	y += int16(font.GetGlyph('0').Info().Height) - 2
+	tinyfont.WriteLine(v, font, x, y, text, v.white)
+}
+
 func (v *SSD1306Adapter) CalcLargeTextWidth(text string) int16 {
 	font := &freemono.Regular12pt7b
+	if len(text) == 0 {
+		return 0
+	}
+
+	_, width := tinyfont.LineWidth(font, text)
+
+	return int16(width)
+}
+
+func (v *SSD1306Adapter) CalcLargeBoldTextWidth(text string) int16 {
+	font := &freemono.Bold12pt7b
+	if len(text) == 0 {
+		return 0
+	}
+
+	_, width := tinyfont.LineWidth(font, text)
+
+	return int16(width)
+}
+
+func (v *SSD1306Adapter) CalcLargeSansTextWidth(text string) int16 {
+	font := &freesans.Regular12pt7b
 	if len(text) == 0 {
 		return 0
 	}

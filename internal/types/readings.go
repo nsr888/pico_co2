@@ -9,9 +9,12 @@ import (
 type Readings struct {
 	Raw RawReadings `json:"raw_readings"`
 
-	FirstReadingTime time.Time          `json:"first_reading_time"`
+	FirstReadingAt time.Time          `json:"first_reading_time"`
 	Calculated       CalculatedReadings `json:"calculated_readings"`
-	CO2History       MeasurementHistory `json:"co2_history"`
+	History          MeasurementHistory `json:"co2_history"`
+	LastUpdateAt     time.Time          `json:"created_at"`
+	IsDrawen         bool               `json:"is_drawn"`
+	LastRaw          RawReadings        `json:"last_raw"`
 
 	Warning string `json:"warning,omitempty"`
 	Error   string `json:"error,omitempty"`
@@ -26,9 +29,11 @@ type RawReadings struct {
 }
 
 type MeasurementHistory struct {
-	Measurements *fifo.FIFO16  `json:"measurements"`
-	AddedAt      time.Time     `json:"added_at"`
-	Granularity  time.Duration `json:"granularity"`
+	CO2         *fifo.FIFO16  `json:"co2"`
+	Temperature *fifo.FIFO16  `json:"temperature"`
+	Humidity    *fifo.FIFO16  `json:"humidity"`
+	AddedAt     time.Time     `json:"added_at"`
+	Granularity time.Duration `json:"granularity"`
 }
 
 type CalculatedReadings struct {
@@ -38,9 +43,11 @@ type CalculatedReadings struct {
 
 func InitReadings(queueSize int) *Readings {
 	return &Readings{
-		CO2History: MeasurementHistory{
-			Measurements: fifo.NewFIFO16(queueSize),
-			Granularity:  time.Minute,
+		History: MeasurementHistory{
+			CO2:         fifo.NewFIFO16(queueSize),
+			Temperature: fifo.NewFIFO16(queueSize),
+			Humidity:    fifo.NewFIFO16(queueSize),
+			Granularity: time.Minute,
 		},
 	}
 }
@@ -50,26 +57,46 @@ func (r *Readings) AddReadings(
 	temperature float32,
 	humidity float32,
 ) {
-	if r.FirstReadingTime.IsZero() {
-		r.FirstReadingTime = time.Now()
+	r.Error = ""
+	r.LastUpdateAt = time.Now()
+
+	if r.FirstReadingAt.IsZero() {
+		r.FirstReadingAt = time.Now()
 	}
 
-	if r.CO2History.Measurements == nil {
+	if r.History.CO2 == nil {
 		return
 	}
 
-	if time.Since(r.CO2History.AddedAt) > r.CO2History.Granularity {
-		r.CO2History.Measurements.Enqueue(int16(co2))
-		r.CO2History.AddedAt = time.Now()
+	if time.Since(r.History.AddedAt) > r.History.Granularity {
+		r.History.CO2.Enqueue(int16(co2))
+		r.History.Temperature.Enqueue(int16(temperature))
+		r.History.Humidity.Enqueue(int16(humidity))
+		r.History.AddedAt = time.Now()
 	}
 
 	heatIndex := status.HeatIndex(temperature, humidity)
 	r.Calculated.HeatIndex = status.ToHeatIndexStatus(heatIndex)
 	r.Calculated.CO2Status = status.ToCO2Index(co2)
 
+	// Store last measurements before updating with new ones
+	r.LastRaw = r.Raw
+
 	r.Raw = RawReadings{
 		CO2:         co2,
 		Temperature: temperature,
 		Humidity:    humidity,
 	}
+}
+
+func (r *Readings) MeasurementsChanged() bool {
+	// If this is the first reading, consider it as changed
+	if r.LastRaw.CO2 == 0 && r.LastRaw.Temperature == 0 &&
+		r.LastRaw.Humidity == 0 {
+		return true
+	}
+
+	return r.Raw.CO2 != r.LastRaw.CO2 ||
+		r.Raw.Temperature != r.LastRaw.Temperature ||
+		r.Raw.Humidity != r.LastRaw.Humidity
 }

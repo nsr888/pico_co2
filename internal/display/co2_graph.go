@@ -10,7 +10,7 @@ func RenderCO2Graph(renderer Renderer, r *types.Readings) {
 	}
 	renderer.Clear()
 
-	rawData := r.CO2History.Measurements.CopyTo()
+	rawData := r.History.CO2.CopyTo()
 
 	renderer.DrawPlot(rawData, "CO2")
 
