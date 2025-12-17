@@ -6,7 +6,7 @@ import (
 	"pico_co2/internal/types"
 )
 
-func RenderBasic(renderer Renderer, r *types.Readings) {
+func RenderLevel(renderer Renderer, r *types.Readings) {
 	if renderer == nil {
 		return
 	}
@@ -17,7 +17,7 @@ func RenderBasic(renderer Renderer, r *types.Readings) {
 
 	var (
 		space int16 = 8
-		lf          = renderer.GetFont(font.FreesansBold12)
+		lf          = renderer.GetFont(font.FreemonoRegular12)
 		sf          = renderer.GetFont(font.ProggySZ8)
 	)
 

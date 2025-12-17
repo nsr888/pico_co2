@@ -69,3 +69,11 @@ func (f *Proggy) Height() int16 {
 
 	return int16(f.charHeight)
 }
+
+func (f *Proggy) GetFont() tinyfont.Fonter {
+	if f == nil {
+		return nil
+	}
+
+	return f.font
+}

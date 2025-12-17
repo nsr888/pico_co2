@@ -9,12 +9,9 @@ import (
 
 	"github.com/nfnt/resize"
 	"tinygo.org/x/tinydraw"
-	"tinygo.org/x/tinyfont"
-	"tinygo.org/x/tinyfont/freemono"
-	"tinygo.org/x/tinyfont/freesans"
-	"tinygo.org/x/tinyfont/proggy"
 
 	"pico_co2/internal/display/bar"
+	"pico_co2/internal/display/font"
 	"pico_co2/pkg/miniplot"
 	"pico_co2/pkg/sparkline"
 )
@@ -25,17 +22,21 @@ type VirtualDisplay struct {
 	height int16
 	white  color.RGBA
 	black  color.RGBA
+	fonts  *font.FontRegistry
 }
 
 func NewVirtualDisplay(w, h int16) *VirtualDisplay {
 	size := w * h
-	return &VirtualDisplay{
+	white := color.RGBA{255, 255, 255, 255}
+	v := &VirtualDisplay{
 		buffer: make([]color.RGBA, size),
 		width:  w,
 		height: h,
-		white:  color.RGBA{255, 255, 255, 255},
+		white:  white,
 		black:  color.RGBA{0, 0, 0, 255},
 	}
+	v.fonts = font.NewFontRegistry(v, white)
+	return v
 }
 
 func (v *VirtualDisplay) Clear() {
@@ -56,6 +57,35 @@ func (v *VirtualDisplay) Size() (int16, int16) {
 
 func (v *VirtualDisplay) Display() error {
 	return nil
+}
+
+// NEW: Unified font management methods
+func (v *VirtualDisplay) GetFont(fontType font.FontType) font.FontPrinter {
+	if v == nil || v.fonts == nil {
+		return nil
+	}
+	return v.fonts.GetFont(fontType)
+}
+
+func (v *VirtualDisplay) DrawText(fontType font.FontType, x, y int16, text string) {
+	if v == nil || v.fonts == nil {
+		return
+	}
+	font := v.fonts.GetFont(fontType)
+	if font != nil {
+		font.Print(x, y, text)
+	}
+}
+
+func (v *VirtualDisplay) CalcTextWidth(fontType font.FontType, text string) int16 {
+	if v == nil || v.fonts == nil {
+		return 0
+	}
+	font := v.fonts.GetFont(fontType)
+	if font != nil {
+		return font.CalcWidth(text)
+	}
+	return 0
 }
 
 func (v *VirtualDisplay) SavePNG(filename string) error {
@@ -85,92 +115,47 @@ func (v *VirtualDisplay) SavePNG(filename string) error {
 }
 
 func (v *VirtualDisplay) DrawXLargeText(x, y int16, text string) {
-	font := &freemono.Bold18pt7b
-	y += int16(font.GetGlyph('0').Info().Height)
-	tinyfont.WriteLine(v, font, x, y, text, v.white)
+	v.DrawText(font.FreemonoBold18, x, y, text)
 }
 
 func (v *VirtualDisplay) CalcXLargeTextWidth(text string) int16 {
-	font := &freemono.Bold18pt7b
-	if len(text) == 0 {
-		return 0
-	}
-
-	_, width := tinyfont.LineWidth(font, text)
-
-	return int16(width)
+	return v.CalcTextWidth(font.FreemonoBold18, text)
 }
 
 func (v *VirtualDisplay) DrawLargeText(x, y int16, text string) {
-	font := &freemono.Regular12pt7b
-	y += int16(font.GetGlyph('0').Info().Height)
-	tinyfont.WriteLine(v, font, x, y, text, v.white)
+	v.DrawText(font.FreemonoRegular12, x, y, text)
 }
 
 func (v *VirtualDisplay) DrawLargeBoldText(x, y int16, text string) {
-	font := &freemono.Bold12pt7b
-	y += int16(font.GetGlyph('0').Info().Height)
-	tinyfont.WriteLine(v, font, x, y, text, v.white)
+	v.DrawText(font.FreemonoBold12, x, y, text)
 }
 
 func (v *VirtualDisplay) DrawLargeSansText(x, y int16, text string) {
-	font := &freesans.Regular12pt7b
-	y += int16(font.GetGlyph('0').Info().Height) - 2
-	tinyfont.WriteLine(v, font, x, y, text, v.white)
+	v.DrawText(font.FreesansRegular12, x, y, text)
 }
 
 func (v *VirtualDisplay) CalcLargeTextWidth(text string) int16 {
-	font := &freemono.Regular12pt7b
-	if len(text) == 0 {
-		return 0
-	}
-
-	_, width := tinyfont.LineWidth(font, text)
-
-	return int16(width)
+	return v.CalcTextWidth(font.FreemonoRegular12, text)
 }
 
 func (v *VirtualDisplay) CalcLargeBoldTextWidth(text string) int16 {
-	font := &freemono.Bold12pt7b
-	if len(text) == 0 {
-		return 0
-	}
-
-	_, width := tinyfont.LineWidth(font, text)
-
-	return int16(width)
+	return v.CalcTextWidth(font.FreemonoBold12, text)
 }
 
 func (v *VirtualDisplay) CalcLargeSansTextWidth(text string) int16 {
-	font := &freesans.Regular12pt7b
-	if len(text) == 0 {
-		return 0
-	}
-
-	_, width := tinyfont.LineWidth(font, text)
-
-	return int16(width)
+	return v.CalcTextWidth(font.FreesansRegular12, text)
 }
 
 func (v *VirtualDisplay) DrawSmallText(x, y int16, text string) {
-	font := &proggy.TinySZ8pt7b
-	y += int16(font.GetGlyph('0').Info().Height)
-	tinyfont.WriteLine(v, font, x, y, text, v.white)
+	v.DrawText(font.ProggySZ8, x, y, text)
 }
 
 func (v *VirtualDisplay) CalcSmallTextWidth(text string) int16 {
-	font := &proggy.TinySZ8pt7b
-	if len(text) == 0 {
-		return 0
-	}
-
-	_, width := tinyfont.LineWidth(font, text)
-
-	return int16(width)
+	return v.CalcTextWidth(font.ProggySZ8, text)
 }
 
 // wrapText splits a string into lines at word boundaries to fit a maximum width.
-func wrapText(text string, font *tinyfont.Font, maxWidth int16) []string {
+func wrapText(text string, font font.FontPrinter, maxWidth int16) []string {
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return []string{}
@@ -182,9 +167,9 @@ func wrapText(text string, font *tinyfont.Font, maxWidth int16) []string {
 	for i := 1; i < len(words); i++ {
 		word := words[i]
 		testLine := currentLine + " " + word
-		_, w := tinyfont.LineWidth(font, testLine)
 
-		if int16(w) > maxWidth {
+		testWidth := font.CalcWidth(testLine)
+		if testWidth > maxWidth {
 			lines = append(lines, currentLine)
 			currentLine = word
 		} else {
@@ -196,13 +181,21 @@ func wrapText(text string, font *tinyfont.Font, maxWidth int16) []string {
 }
 
 func (v *VirtualDisplay) DrawLongText(x, y int16, text string) {
-	font := &proggy.TinySZ8pt7b
+	if v == nil || v.fonts == nil {
+		return
+	}
+
+	font := v.fonts.GetFont(font.ProggySZ8)
+	if font == nil {
+		return
+	}
+
 	width, height := v.Size()
 
 	// Wrap text to fit the display width, accounting for the initial x offset.
 	lines := wrapText(text, font, width-x)
 
-	fontHeight := int16(font.GetGlyph('A').Info().Height)
+	fontHeight := font.Height()
 	lineHeight := fontHeight + 1 // Font height + 1px spacing
 
 	// Calculate how many lines can be drawn in the available vertical space.
@@ -218,16 +211,24 @@ func (v *VirtualDisplay) DrawLongText(x, y int16, text string) {
 		}
 		// Y-coordinate for the baseline of the current line.
 		drawY := y + fontHeight + (int16(i) * lineHeight)
-		tinyfont.WriteLine(v, font, x, drawY, line, v.white)
+		font.Print(x, drawY, line)
 	}
 }
 
 func (v *VirtualDisplay) DrawPlot(data []int16, title string) {
-	font := &proggy.TinySZ8pt7b
+	if v == nil || v.fonts == nil {
+		return
+	}
+
+	font := v.fonts.GetFont(font.ProggySZ8)
+	if font == nil {
+		return
+	}
+
 	width, height := v.Size()
 	miniPlot, err := miniplot.NewMiniPlot(
 		v,
-		font,
+		font.GetFont(),
 		width,
 		height,
 		v.white,
@@ -247,19 +248,27 @@ func (v *VirtualDisplay) DrawTwoSideBar(
 	leftCount int16,
 	rightCount int16,
 ) int16 {
+	if v == nil || v.fonts == nil {
+		return y
+	}
+
 	var (
 		radius     int16 = 3
 		barSpacing int16 = 5
 	)
 
-	font := &proggy.TinySZ8pt7b
+	font := v.fonts.GetFont(font.ProggySZ8)
+	if font == nil {
+		return y
+	}
+
 	hbar := bar.NewTwoSideBar(
 		v,
 		radius,
 		barSpacing,
 		leftCount,
 		rightCount,
-		font,
+		font.GetFont(),
 		v.white,
 	)
 

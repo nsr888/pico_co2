@@ -1,5 +1,7 @@
 package font
 
+import "tinygo.org/x/tinyfont"
+
 type FontPrinter interface {
 	// Print draws the text at the specified x, y coordinates, where x and y are
 	// the top-left corner of the text.
@@ -7,4 +9,5 @@ type FontPrinter interface {
 	CalcWidth(text string) int16
 	Height() int16
 	Width() int16
+	GetFont() tinyfont.Fonter
 }
