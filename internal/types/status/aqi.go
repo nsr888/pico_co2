@@ -23,16 +23,16 @@ var AQIIndexStrings = [...]string{
 }
 
 func ToAQIIndex(aqi uint8) AQIIndex {
-	switch {
-	case aqi == 0:
+	switch  aqi{
+	case 0:
 		return Excellent
-	case aqi == 1:
+	case 1:
 		return Good
-	case aqi == 2:
+	case 2:
 		return Moderate
-	case aqi == 3:
+	case 3:
 		return Poor
-	case aqi == 4:
+	case 4:
 		return Unhealthy
 	default:
 		return UnknownAQI

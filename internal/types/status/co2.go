@@ -49,3 +49,30 @@ func (c CO2Index) String() string {
 func (c CO2Index) MarshalJSON() ([]byte, error) {
 	return json.Marshal(c.String())
 }
+
+type CO2Trend uint8
+
+const (
+	StableCO2 CO2Trend = iota
+	RisingCO2
+	FallingCO2
+	UnknownCO2Trend
+)
+
+var CO2TrendStrings = [...]string{
+	"Stable",
+	"Rising",
+	"Falling",
+	"Unknown",
+}
+
+func (c CO2Trend) String() string {
+	if c < StableCO2 || c > UnknownCO2Trend {
+		return "Unknown"
+	}
+	return CO2TrendStrings[c]
+}
+
+func (c CO2Trend) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.String())
+}

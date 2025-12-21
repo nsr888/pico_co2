@@ -11,8 +11,8 @@ func RenderError(renderer Renderer, r *types.Readings) {
 
 	renderer.Clear()
 
-	if r != nil && r.Warning != "" {
-		renderer.DrawLongText(0, 0, r.Warning)
+	if r != nil && r.Error != "" {
+		renderer.DrawLongText(0, 0, r.Error)
 	} else {
 		renderer.DrawLongText(0, 0, "No error message available")
 	}

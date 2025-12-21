@@ -22,7 +22,7 @@ func RenderBars(renderer Renderer, r *types.Readings) {
 	renderer.DrawTwoSideBar(
 		36,
 		lineY,
-		int16(r.Calculated.CO2Status),
+		int16(status.CO2Index(r.Raw.CO2)),
 		"CO2",
 		0,
 		4,

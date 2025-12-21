@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"pico_co2/internal/types"
+	"pico_co2/internal/types/status"
 )
 
 func RenderLargeBar(renderer Renderer, r *types.Readings) {
@@ -17,12 +18,13 @@ func RenderLargeBar(renderer Renderer, r *types.Readings) {
 	var (
 		XPos int16 = 0
 		YPos int16 = 0
+		co2index	 = status.CO2Index(r.Raw.CO2)
 	)
-	renderer.DrawSmallText(XPos, YPos, r.Calculated.CO2Status.String())
+	renderer.DrawSmallText(XPos, YPos, co2index.String())
 
 	XPos = 0
 	YPos = 12
-	renderer.DrawSquareBar(XPos, YPos, uint8(r.Calculated.CO2Status))
+	renderer.DrawSquareBar(XPos, YPos, uint8(co2index))
 
 	co2Str := fmt.Sprintf("CO2 %d", r.Raw.CO2)
 	XPos = 0

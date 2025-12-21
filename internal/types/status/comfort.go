@@ -7,7 +7,7 @@ func CalculateComfortIndex(T, RH float32) int16 {
 	adjustedTemp = T
 
 	if T >= 27.0 {
-		adjustedTemp = HeatIndex(T, RH)
+		adjustedTemp = HeatIndexVal(T, RH)
 	}
 
 	// Map to 7-bar scale using adjusted temperature thresholds
@@ -32,7 +32,14 @@ func CalculateComfortIndex(T, RH float32) int16 {
 }
 
 // ComfortStatus returns a human-readable comfort status based on sensor readings.
-func ComfortStatus(co2 uint16, aqi uint8, heatIndex float32, humidity float32, temperature float32) string {
+func ComfortStatus(
+	co2 uint16,
+	aqi uint8,
+	humidity float32,
+	temperature float32,
+) string {
+	heatIndex := HeatIndexVal(temperature, humidity)
+
 	switch {
 	case co2 < 1000 && aqi >= 3:
 		return "Poor Air"

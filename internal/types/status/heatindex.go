@@ -3,8 +3,8 @@ package status
 import "encoding/json"
 
 // https://en.wikipedia.org/wiki/Heat_index#Formula
-func HeatIndex(tempC, rh float32) float32 {
-	if tempC < 27 {
+func HeatIndexVal(tempC, rh float32) float32 {
+	if tempC < 27.0 {
 		return tempC
 	}
 
@@ -32,10 +32,10 @@ func HeatIndex(tempC, rh float32) float32 {
 	return resultC
 }
 
-type HeatIndexStatus uint8
+type HeatIndex uint8
 
 const (
-	NoHeat HeatIndexStatus = iota
+	NoHeat HeatIndex = iota
 	Caution
 	ExtremeCaution
 	Danger
@@ -52,7 +52,12 @@ var HeatIndexStatusStrings = [...]string{
 	"Unknown Heat Index",
 }
 
-func ToHeatIndexStatus(heatIndex float32) HeatIndexStatus {
+func GetHeatIndex(tempC, rh float32) HeatIndex {
+	heatIndex := HeatIndexVal(tempC, rh)
+	return getHeatIndex(heatIndex)
+}
+
+func getHeatIndex(heatIndex float32) HeatIndex {
 	switch {
 	case heatIndex < 27:
 		return NoHeat
@@ -67,13 +72,13 @@ func ToHeatIndexStatus(heatIndex float32) HeatIndexStatus {
 	}
 }
 
-func (h HeatIndexStatus) String() string {
+func (h HeatIndex) String() string {
 	if h < NoHeat || h > UnknownHeatIndex {
 		return "Unknown Heat Index"
 	}
 	return HeatIndexStatusStrings[h]
 }
 
-func (h HeatIndexStatus) MarshalJSON() ([]byte, error) {
+func (h HeatIndex) MarshalJSON() ([]byte, error) {
 	return json.Marshal(h.String())
 }

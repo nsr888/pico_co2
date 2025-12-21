@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	queueCapacity       = 128 // Number of readings to keep in memory
+	queueCapacity       = 480 // Number of readings to keep in memory
 	displayWidth  int16 = 128
 	displayHeight int16 = 32
 )
@@ -49,15 +49,6 @@ func main() {
 		{
 			name: "normal",
 			readings: func(r *types.Readings) *types.Readings {
-				r.Warning = ""
-				r.Error = ""
-				return r
-			},
-		},
-		{
-			name: "warning",
-			readings: func(r *types.Readings) *types.Readings {
-				r.Warning = "Waiting for data..."
 				r.Error = ""
 				return r
 			},
@@ -65,7 +56,6 @@ func main() {
 		{
 			name: "error",
 			readings: func(r *types.Readings) *types.Readings {
-				r.Warning = ""
 				r.Error = "Test error message for display with long text that should wrap correctly across multiple lines."
 				return r
 			},

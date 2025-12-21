@@ -2,8 +2,8 @@ package display
 
 import (
 	"fmt"
-
 	"pico_co2/internal/types"
+	"pico_co2/internal/types/status"
 )
 
 func RenderCO2BarWithNums(renderer Renderer, r *types.Readings) {
@@ -20,11 +20,13 @@ func RenderCO2BarWithNums(renderer Renderer, r *types.Readings) {
 
 	x = 0
 	y = 0
-	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.HeatIndex), "HEAT  ", 0, 4)
+	hi := status.GetHeatIndex(r.Raw.Temperature, r.Raw.Humidity)
+	renderer.DrawTwoSideBar(x, y, int16(hi), "HEAT  ", 0, 4)
 
 	x = 0
 	y = 11
-	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2   ", 0, 4)
+	co2status := int16(status.CO2Index(r.Raw.CO2))
+	renderer.DrawTwoSideBar(x, y, co2status, "CO2   ", 0, 4)
 
 	x = 0
 	y = 22

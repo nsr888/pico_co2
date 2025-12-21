@@ -21,7 +21,7 @@ func RenderHeatIndexStatus(renderer Renderer, r *types.Readings) {
 
 	x = 0
 	y = 0
-	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.CO2Status), "CO2 ", 0, 4)
+	renderer.DrawTwoSideBar(x, y, int16(status.CO2Index(r.Raw.CO2)), "CO2 ", 0, 4)
 
 	co2Value := fmt.Sprintf("%d", r.Raw.CO2)
 	renderer.DrawLargeText(int16(width-renderer.CalcLargeTextWidth(co2Value)), y, co2Value)
@@ -29,7 +29,8 @@ func RenderHeatIndexStatus(renderer Renderer, r *types.Readings) {
 	// Heat Index status
 	x = 0
 	y = 11
-	renderer.DrawTwoSideBar(x, y, int16(r.Calculated.HeatIndex), "HI  ", 0, 4)
+	hi := status.GetHeatIndex(r.Raw.Temperature, r.Raw.Humidity)
+	renderer.DrawTwoSideBar(x, y, int16(hi), "HI  ", 0, 4)
 
 	y = 22
 	humStr := fmt.Sprintf("%.0f", r.Raw.Humidity)
@@ -42,7 +43,6 @@ func RenderHeatIndexStatus(renderer Renderer, r *types.Readings) {
 	status := status.ComfortStatus(
 		r.Raw.CO2,
 		r.Raw.AQI,
-		status.HeatIndex(r.Raw.Temperature, r.Raw.Humidity),
 		r.Raw.Humidity,
 		r.Raw.Temperature,
 	)

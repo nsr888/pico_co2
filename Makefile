@@ -7,7 +7,10 @@ flash:
 	tinygo flash -size=short -target=pico -monitor ./cmd/pico_co2/
 
 build:
-	tinygo build -size=short -target=pico -o main.uf2 ./cmd/pico_co2/
+	tinygo build -size=full -target=pico -o main.elf ./cmd/pico_co2/
+
+size:
+	go tool nm -size main.elf | sort -k 2,2 -nr | head -n 20
 
 version:
 	go version

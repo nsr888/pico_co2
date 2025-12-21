@@ -6,6 +6,8 @@ import (
 	"tinygo.org/x/drivers"
 	"tinygo.org/x/tinyfont/freemono"
 	"tinygo.org/x/tinyfont/freesans"
+	"tinygo.org/x/tinyfont/notoemoji"
+	"tinygo.org/x/tinyfont/notosans"
 )
 
 // FontType represents different font categories available in the system
@@ -16,11 +18,15 @@ const (
 	FreemonoBold18
 	FreemonoRegular12
 	FreemonoBold12
+	FreemonoRegular9
+	FreemonoBold9
 	FreesansRegular12
 	FreesansBold12
 	FreesansRegular9
 	FreesansBold9
 	ProggySZ8
+	Notoemoji
+	Notosans
 )
 
 // FontRegistry manages font instances and provides centralized access
@@ -64,20 +70,6 @@ func (fr *FontRegistry) GetFont(fontType FontType) FontPrinter {
 	return font
 }
 
-// SetColor updates the text color for all fonts
-func (fr *FontRegistry) SetColor(c color.RGBA) {
-	if fr == nil {
-		return
-	}
-
-	fr.color = c
-
-	// Update all fonts with new color
-	for fontType := range fr.fonts {
-		fr.fonts[fontType] = fr.createFont(fontType)
-	}
-}
-
 // initializeFonts creates and registers all available fonts
 func (fr *FontRegistry) initializeFonts() {
 	fontTypes := []FontType{
@@ -85,11 +77,15 @@ func (fr *FontRegistry) initializeFonts() {
 		FreemonoBold18,
 		FreemonoRegular12,
 		FreemonoBold12,
+		FreemonoRegular9,
+		FreemonoBold9,
 		FreesansRegular12,
 		FreesansBold12,
 		FreesansRegular9,
 		FreesansBold9,
 		ProggySZ8,
+		Notoemoji,
+		Notosans,
 	}
 
 	for _, fontType := range fontTypes {
@@ -124,6 +120,18 @@ func (fr *FontRegistry) createFont(fontType FontType) FontPrinter {
 			color:   fr.color,
 			font:    &freemono.Bold12pt7b,
 		}
+	case FreemonoRegular9:
+		return &TinyFontWrapper{
+			display: fr.display,
+			color:   fr.color,
+			font:    &freemono.Regular9pt7b,
+		}
+	case FreemonoBold9:
+		return &TinyFontWrapper{
+			display: fr.display,
+			color:   fr.color,
+			font:    &freemono.Bold9pt7b,
+		}
 	case FreesansRegular12:
 		return &TinyFontWrapper{
 			display: fr.display,
@@ -147,6 +155,18 @@ func (fr *FontRegistry) createFont(fontType FontType) FontPrinter {
 			display: fr.display,
 			color:   fr.color,
 			font:    &freesans.Bold9pt7b,
+		}
+	case Notoemoji:
+		return &TinyFontWrapper{
+			display: fr.display,
+			color:   fr.color,
+			font:    &notoemoji.NotoEmojiRegular16pt,
+		}
+	case Notosans:
+		return &TinyFontWrapper{
+			display: fr.display,
+			color:   fr.color,
+			font:    &notosans.Notosans12pt,
 		}
 	case ProggySZ8:
 		// Use existing Proggy implementation for small text

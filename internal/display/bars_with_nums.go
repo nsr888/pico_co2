@@ -2,6 +2,7 @@ package display
 
 import (
 	"fmt"
+	"math"
 	"pico_co2/internal/display/font"
 	"pico_co2/internal/types"
 	"pico_co2/internal/types/status"
@@ -15,36 +16,50 @@ func RenderBarsWithLargeNums(renderer Renderer, r *types.Readings) {
 	renderer.Clear()
 
 	var (
-		y          int16 = 0
-		x          int16 = 0
-		barSpacing int16 = 5
-		lf               = renderer.GetFont(font.FreemonoRegular12)
+		y         int16 = 1
+		x         int16
+		co2status int16
+		lf       = renderer.GetFont(font.FreemonoRegular9)
+		// sf        = renderer.GetFont(font.ProggySZ8)
 	)
 
-	// Print first line with CO2 and AQI
-	comfortIndex := status.CalculateComfortIndex(
-		r.Raw.Temperature,
-		r.Raw.Humidity,
-	)
-	x = renderer.DrawTwoSideBar(x, y, int16(comfortIndex), "T", 0, 4)
-	co2status := int16(r.Calculated.CO2Status)
-	renderer.DrawTwoSideBar(x+barSpacing, y, co2status, "C", 0, 4)
+	width, _ := renderer.Size()
 
+	// First line
+	heatIndex := status.GetHeatIndex(r.Raw.Temperature, r.Raw.Humidity)
+	x = renderer.DrawTwoSideBar(x, y, int16(heatIndex), "T", 0, 2)
+
+
+	// https://backend.orbit.dtu.dk/ws/portalfiles/portal/348932926/1-s2.0-S0360132323011459-main_1_.pdf
+	switch {
+	case r.Raw.CO2 < 800:
+		co2status = 0
+	case r.Raw.CO2 < 1000:
+		co2status = 1
+	default:
+		co2status = 2
+	}
+	x = 96
+	renderer.DrawTwoSideBar(x, y, co2status, "C", 0, 2)
+
+	// second line
 	x = 0
 	y = 16
-	// Print temperature
-	temp := fmt.Sprintf("%.0f", r.Raw.Temperature)
-	lf.Print(x, y, temp)
+	tempStr := fmt.Sprintf(
+		"%.0f",
+		math.Round(float64(r.Raw.Temperature)),
+	)
+	lf.Print(x, y, tempStr)
+	humStr := fmt.Sprintf(
+		"%.0f",
+		math.Round(float64(r.Raw.Humidity)),
+	)
+	co2str := fmt.Sprintf("%d", r.Raw.CO2)
+	xHum := lf.CalcWidth(tempStr) + (width - lf.CalcWidth(tempStr) - lf.CalcWidth(humStr) - lf.CalcWidth(co2str))/2
+	lf.Print(xHum, y, humStr)
 
-	// Print humidity
-	hum := fmt.Sprintf("%.0f", r.Raw.Humidity)
-	x = int16(x + 10 + renderer.CalcLargeSansTextWidth(temp))
-	lf.Print(x, y, hum)
-
-	// Print CO2 value
-	co2 := fmt.Sprintf("%d", r.Raw.CO2)
-	x = 128 - renderer.CalcLargeTextWidth(co2)
-	lf.Print(x, y, co2)
+	xCO2 := width - lf.CalcWidth(co2str)
+	lf.Print(xCO2, y, co2str)
 
 	renderer.Display()
 }

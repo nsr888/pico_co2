@@ -3,7 +3,7 @@ package display
 import (
 	"fmt"
 	"image/color"
-
+	"math"
 	"pico_co2/internal/types"
 	"pico_co2/internal/types/status"
 )
@@ -23,19 +23,26 @@ func RenderTempHumid(renderer Renderer, r *types.Readings) {
 	var verticalBarWidth int16 = 4
 	var spacing int16 = 20
 
-	temp := fmt.Sprintf("%.0f", r.Raw.Temperature)
+	temp := fmt.Sprintf("%.0f", math.Round(float64(r.Raw.Temperature)))
 	tempWidth := renderer.CalcXLargeTextWidth(temp)
 	xPos = int16(0)
 	yPos = int16(8)
 	renderer.DrawXLargeText(xPos, yPos, temp)
 	// TODO: move to driver
-	DrawVerticalBar(renderer, tempWidth+4, yPos, int16(r.Calculated.HeatIndex))
+	hi := status.GetHeatIndex(r.Raw.Temperature, r.Raw.Humidity)
+	DrawVerticalBar(renderer, tempWidth+4, yPos, int16(hi), 4)
 
-	hum := fmt.Sprintf("%.0f", r.Raw.Humidity)
+	hum := fmt.Sprintf("%.0f", math.Round(float64(r.Raw.Humidity)))
 	humWidth := renderer.CalcXLargeTextWidth(hum)
 	xPos = tempWidth + verticalBarWidth + spacing
 	renderer.DrawXLargeText(xPos, yPos, hum)
-	DrawVerticalBar(renderer, xPos+humWidth+4, yPos, status.HumidityComfortIndex(r.Raw.Humidity))
+	DrawVerticalBar(
+		renderer,
+		xPos+humWidth+4,
+		yPos,
+		status.HumidityComfortIndex(r.Raw.Humidity),
+		4,
+	)
 
 	xPos = int16(0)
 	yPos = int16(0)
@@ -46,16 +53,21 @@ func RenderTempHumid(renderer Renderer, r *types.Readings) {
 	renderer.Display()
 }
 
-func DrawVerticalBar(renderer Renderer, x, y, filledBars int16) {
+func DrawVerticalBar(
+	renderer Renderer,
+	x, y, filledBars, maxBars int16,
+) {
 	if renderer == nil {
 		return
 	}
 
 	black := color.RGBA{255, 255, 255, 255}
 
-	const maxBars = 4
 	y += 5
 	unfilledBars := maxBars - filledBars
+	if unfilledBars < 0 {
+		unfilledBars = 0
+	}
 
 	coef := func(i int16) int16 {
 		return (i * 5)
@@ -67,7 +79,7 @@ func DrawVerticalBar(renderer Renderer, x, y, filledBars int16) {
 	}
 
 	// Draw empty bars
-	for i := unfilledBars; i < 4; i++ {
+	for i := unfilledBars; i < maxBars; i++ {
 		drawBlock(renderer, x, y+coef(i), x+3, y+coef(i), black)
 	}
 }

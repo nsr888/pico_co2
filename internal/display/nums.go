@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"pico_co2/internal/types"
+	"pico_co2/internal/types/status"
 )
 
 func RenderNums(renderer Renderer, r *types.Readings) {
@@ -17,7 +18,7 @@ func RenderNums(renderer Renderer, r *types.Readings) {
 		x int16
 	)
 
-	renderer.DrawSmallText(x, y, fmt.Sprintf("CO2: %s", r.Calculated.CO2Status))
+	renderer.DrawSmallText(x, y, fmt.Sprintf("CO2: %s", status.CO2Index(r.Raw.CO2)))
 
 	x = 0
 	y = 8

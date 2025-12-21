@@ -53,8 +53,8 @@ func DefaultConfig() Config {
 	cfg.Timeouts.Startup = 1 * time.Minute
 	cfg.Timeouts.Minute = 60 * time.Second
 	cfg.Timeouts.MinimalInterval = 1 * time.Second
-	cfg.QueueCapacity = 128
-	cfg.DefaultDisplayIndex = 2
+	cfg.QueueCapacity = 480
+	cfg.DefaultDisplayIndex = 0
 	return cfg
 }
 

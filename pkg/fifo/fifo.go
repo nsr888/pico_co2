@@ -70,14 +70,49 @@ func (q *FIFO16) PeekAll(fn func(int16)) {
 	}
 }
 
-func (q *FIFO16) CopyTo() []int16 {
-	out := make([]int16, q.count)
-	idx := q.head
-	for i := 0; i < q.count; i++ {
-		out[i] = q.buf[idx]
-		idx = (idx + 1) % q.capacity
+// Contiguous returns a single slice containing all queue elements in order.
+// To achieve this, it may rearrange the internal buffer to make the elements
+// contiguous. This is an in-place operation that avoids allocations.
+// The returned slice is a view into the queue's internal buffer and should
+// not be modified. The slice is valid until the next modification of the queue.
+func (q *FIFO16) Contiguous() []int16 {
+	if q.count == 0 {
+		return nil
 	}
-	return out
+
+	if q.head < q.tail {
+		return q.buf[q.head:q.tail]
+	}
+
+	// Data is wrapped. Rearrange it to be contiguous using in-place rotation.
+	// The queue layout is:
+	// [ tail .... head-1 | head .... end ]
+	// We want to rotate it to:
+	// [ head .... end | tail .... head-1 ]
+	// This is done by reversing three segments:
+	// 1. Reverse [0..head-1]
+	// 2. Reverse [head..end]
+	// 3. Reverse [0..end]
+	reverse(q.buf, 0, q.head-1)
+	reverse(q.buf, q.head, q.capacity-1)
+	reverse(q.buf, 0, q.capacity-1)
+
+	q.head = 0
+	q.tail = q.count % q.capacity
+
+	return q.buf[0:q.count]
+}
+
+// reverse reverses elements of s in the range [from, to] in place.
+func reverse(s []int16, from, to int) {
+	if from >= to {
+		return
+	}
+	for from < to {
+		s[from], s[to] = s[to], s[from]
+		from++
+		to--
+	}
 }
 
 /*

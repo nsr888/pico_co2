@@ -76,7 +76,7 @@ func (cfg *TwoSideBar) drawBars(
 	}
 
 	barX := x + cfg.radiusFilled
-	for i := int16(0); i < count; i++ {
+	for i := range count {
 		if isFilled(i) && isLeftSide {
 			cfg.drawLargeDot(barX, y)
 		}
