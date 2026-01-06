@@ -2,7 +2,7 @@
 
 Raspberry Pico CO2 measurements
 
-This project is designed to measure temperature + CO2 levels using a Raspberry Pi Pico microcontroller. It integrates sensors and displays to provide real-time data visualization.
+This project is designed to show time, temperature, CO2 levels using a Raspberry Pi Pico microcontroller. It integrates sensors and displays to provide real-time data visualization.
 
 ## Hardware installation
 
@@ -12,11 +12,8 @@ This project is designed to measure temperature + CO2 levels using a Raspberry P
 - SSD1306 display
 - AHT20+ENS160 sensor
 - SCD4x sensor
+- DS3231
 - touch buttons (2x)
-
-### Connection
-
-![pico_co2_](https://github.com/user-attachments/assets/616411a3-a43a-46e7-acf2-e7d9d982135e)
 
 ## Software installation
 
@@ -34,45 +31,13 @@ make test-displays
 
 Below are examples of the different display themes available:
 
-### Basic Display
+### Main Display
 
-![Basic Display](images/normal/basic.png)
-
-### Bar Display
-
-![Bar Display](images/normal/bars.png)
-
-### Bar Display with Large Numbers
-
-![Bar Display with Large Numbers](images/normal/bars_with_large_nums.png)
-
-### Large Bar Display
-
-![Large Bar Display](images/normal/large_bar.png)
-
-### Numbers Only Display
-
-![Numbers Only Display](images/normal/nums.png)
+![Main Display](images/normal/RenderTime.png)
 
 ### CO2 Graph Display
 
-![CO2 Graph Display](images/normal/co2_graph.png)
-
-### Temperature and Humidity Display
-
-![Temperature and Humidity Display](images/normal/temp_humid.png)
-
-### AQI Bar with Numbers Display
-
-![AQI Bar with Numbers Display](images/normal/aqi_bar_with_nums.png)
-
-### Heat Index Status Display
-
-![Heat Index Status Display](images/normal/render_heat_index_status.png)
-
-### Sparkline Display
-
-![Sparkline Display](images/normal/sparkline.png)
+![CO2 Graph Display](images/normal/RenderSparklineCO2.png)
 
 ## Case
 
