@@ -13,6 +13,7 @@ var MethodRegistry = []RenderMethod{
 	// {"RenderLevel", RenderLevel},
 	// {"RenderCO2BarWithNums", RenderCO2BarWithNums},
 	// {"RenderBars", RenderBars},
+	{"RenderTime", RenderTime},
 	{"RenderBarsWithLargeNums", RenderBarsWithLargeNums},
 	// {"RenderBasic", RenderBasic},
 	// {"RenderCO2Graph", RenderCO2Graph},

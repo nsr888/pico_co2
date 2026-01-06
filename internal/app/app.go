@@ -12,6 +12,7 @@ import (
 
 	"tinygo.org/x/drivers"
 	"tinygo.org/x/drivers/aht20"
+	"tinygo.org/x/drivers/ds3231"
 	"tinygo.org/x/drivers/scd4x"
 	"tinygo.org/x/drivers/ssd1306"
 )
@@ -32,9 +33,9 @@ type Config struct {
 		Button2 machine.Pin
 	}
 	Timeouts struct {
-		Startup         time.Duration
-		Minute          time.Duration
-		MinimalInterval time.Duration
+		Startup time.Duration
+		Minute  time.Duration
+		Second  time.Duration
 	}
 	QueueCapacity       int
 	DefaultDisplayIndex int
@@ -51,8 +52,8 @@ func DefaultConfig() Config {
 	cfg.Buttons.Button1 = machine.GP10
 	cfg.Buttons.Button2 = machine.GP11
 	cfg.Timeouts.Startup = 1 * time.Minute
-	cfg.Timeouts.Minute = 60 * time.Second
-	cfg.Timeouts.MinimalInterval = 1 * time.Second
+	cfg.Timeouts.Minute = 1 * time.Minute
+	cfg.Timeouts.Second = 1 * time.Second
 	cfg.QueueCapacity = 480
 	cfg.DefaultDisplayIndex = 0
 	return cfg
@@ -192,6 +193,10 @@ func (dm *DisplayManager) NextDisplay() {
 	dm.currentIndex = (dm.currentIndex + 1) % len(display.MethodRegistry)
 }
 
+func (dm *DisplayManager) PreviousDisplay() {
+	dm.currentIndex = (dm.currentIndex - 1 + len(display.MethodRegistry)) % len(display.MethodRegistry)
+}
+
 func (dm *DisplayManager) Render(readings *types.Readings) {
 	if readings.Error != "" {
 		display.RenderError(dm.renderer, readings)
@@ -212,6 +217,7 @@ type App struct {
 	displayManager *DisplayManager
 	button1        *button.TouchButton
 	button2        *button.TouchButton
+	ds3231         *ds3231.Device
 }
 
 func New(cfg Config) (*App, error) {
@@ -230,12 +236,34 @@ func New(cfg Config) (*App, error) {
 		return nil, fmt.Errorf("sensors init: %w", err)
 	}
 
+	ds3231Sensor := ds3231.New(machine.I2C0)
+	if ok := ds3231Sensor.Configure(); !ok {
+		return nil, fmt.Errorf("failed to configure DS3231 sensor")
+	}
+
+	dt, _ := ds3231Sensor.ReadTime()
+
+	if dt.Year() > 2200 || dt.Year() < 2024 {
+		now := time.Date(2025, 12, 21, 14, 35, 0, 0, time.UTC)
+		ds3231Sensor.SetTime(now)
+		println("DS3231 time set to:", now.Format(time.DateTime))
+	}
+
+	running := ds3231Sensor.IsRunning()
+	if !running {
+		err := ds3231Sensor.SetRunning(true)
+		if err != nil {
+			return nil, fmt.Errorf("ds3231 set running: %w", err)
+		}
+	}
+
 	return &App{
 		config:         cfg,
 		sensors:        sensors,
 		displayManager: NewDisplayManager(renderer, cfg.DefaultDisplayIndex),
 		button1:        button.NewTouchButton(cfg.Buttons.Button1),
 		button2:        button.NewTouchButton(cfg.Buttons.Button2),
+		ds3231:         &ds3231Sensor,
 	}, nil
 }
 
@@ -263,59 +291,68 @@ func (a *App) Run() {
 
 func (a *App) handleInput(readings *types.Readings) {
 	if a.button1.Consume() {
+		a.displayManager.PreviousDisplay()
+		readings.IsDrawen = false
+	}
+
+	if a.button2.Consume() {
 		a.displayManager.NextDisplay()
 		readings.IsDrawen = false
 	}
 }
 
-func (a *App) shouldAlwaysUpdateDisplay() bool {
-	// Displays that should always update regardless of measurement changes
-	alwaysUpdateDisplays := []string{
-		"RenderCO2Graph",
-		"RenderSparkline",
-	}
+func (a *App) updateReadings(readings *types.Readings) {
+	shouldUpdateTimeRead := readings.Time.LastRead.IsZero() ||
+		time.Since(readings.Time.LastRead) >= time.Duration(time.Second)
 
-	if a.displayManager.currentIndex >= len(display.MethodRegistry) {
-		return false
-	}
-
-	currentDisplayName := display.MethodRegistry[a.displayManager.currentIndex].Name
-	for _, name := range alwaysUpdateDisplays {
-		if currentDisplayName == name {
-			return true
+	if shouldUpdateTimeRead {
+		curTime, err := a.ds3231.ReadTime()
+		if err != nil {
+			readings.Error = fmt.Sprintf("DS3231: %v", err)
+			readings.IsDrawen = false
+		} else {
+			println("DS3231 time read:", curTime.Format(time.DateTime))
+			readings.Time.LastRead = time.Now()
+			if readings.Time.Minute != curTime.Minute() {
+				println("DS3231 minute changed:", curTime.Format(time.DateTime))
+				readings.Time.Minute = curTime.Minute()
+				readings.Time.Hour = curTime.Hour()
+				readings.IsDrawen = false
+			}
 		}
 	}
-	return false
-}
 
-func (a *App) updateReadings(readings *types.Readings) {
-	shouldUpdate := cmp.Or(
+	shouldUpdateSensorRead := cmp.Or(
+		// First ever reading
 		readings.LastUpdateAt.IsZero(),
-		a.button2.Consume(),
-		time.Since(readings.LastUpdateAt) >= a.config.Timeouts.MinimalInterval &&
-			time.Since(readings.FirstReadingAt) < a.config.Timeouts.Startup,
-		time.Since(readings.LastUpdateAt) >= a.config.Timeouts.Minute,
+		// Initial startup period
+		time.Since(readings.LastUpdateAt) >= time.Duration(time.Second) &&
+			time.Since(readings.FirstReadingAt) < time.Duration(time.Minute),
+		// Regular update interval
+		time.Since(readings.LastUpdateAt) >= time.Duration(time.Minute),
 	)
 
-	if shouldUpdate {
+	if shouldUpdateSensorRead {
 		if raw, err := a.sensors.Read(); err != nil {
 			readings.Error = err.Error()
 			readings.IsDrawen = false
 		} else {
-			readings.AddReadings(raw.CO2, raw.Temperature, raw.Humidity)
-			fmt.Printf("time: %s, CO2: %d ppm, T: %.2f °C, H: %.2f %%, co2 len: %d, temp len: %d, hum len: %d\n",
-				time.Now().Format("15:04:05"),
+			readings.AddReadings(
+				raw.CO2,
+				raw.Temperature,
+				raw.Humidity,
+			)
+			fmt.Printf("%s, time: %02d:%02d, CO2: %d ppm, T: %.2f °C, H: %.2f %%, co2 len: %d, temp len: %d, hum len: %d\n",
+			    time.Now().Format(time.DateTime),
+				readings.Time.Hour,
+				readings.Time.Minute,
 				raw.CO2, raw.Temperature, raw.Humidity,
 				readings.History.CO2.Len(),
 				readings.History.Temperature.Len(),
 				readings.History.Humidity.Len(),
 			)
 			readings.Error = ""
-
-			// Mark as needing redraw if measurements changed or display should always update
-			if readings.MeasurementsChanged() || a.shouldAlwaysUpdateDisplay() {
-				readings.IsDrawen = false
-			}
+			readings.IsDrawen = false
 		}
 	}
 }

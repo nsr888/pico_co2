@@ -25,6 +25,9 @@ func main() {
 	vd := display.NewVirtualDisplay(displayWidth, displayHeight)
 
 	testReadings := types.InitReadings(queueCapacity)
+	testReadings.Time.LastRead = time.Now()
+	testReadings.Time.Hour = 14
+	testReadings.Time.Minute = 23
 	testReadings.FirstReadingAt = testReadings.FirstReadingAt.Add(-3 * time.Minute)
 
 	countMeasurements := queueCapacity

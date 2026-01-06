@@ -16,6 +16,13 @@ type Readings struct {
 	LastRaw        RawReadings
 	IsDrawen       bool
 	Error          string
+	Time           Time
+}
+
+type Time struct {
+	Hour    int
+	Minute  int
+	LastRead time.Time
 }
 
 type RawReadings struct {
@@ -180,16 +187,4 @@ func (r *Readings) calculateCO2Trend() {
 	// Store averages for debugging/analysis
 	r.Calculated.CO25MinAvgPrev = prevAvg
 	r.Calculated.CO25MinAvgCurr = currAvg
-}
-
-func (r *Readings) MeasurementsChanged() bool {
-	// If this is the first reading, consider it as changed
-	if r.LastRaw.CO2 == 0 && r.LastRaw.Temperature == 0 &&
-		r.LastRaw.Humidity == 0 {
-		return true
-	}
-
-	return r.Raw.CO2 != r.LastRaw.CO2 ||
-		r.Raw.Temperature != r.LastRaw.Temperature ||
-		r.Raw.Humidity != r.LastRaw.Humidity
 }

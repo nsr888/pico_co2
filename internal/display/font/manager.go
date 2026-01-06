@@ -14,7 +14,7 @@ import (
 type FontType int
 
 const (
-	FremonoRegular18 FontType = iota
+	FreemonoRegular18 FontType = iota
 	FreemonoBold18
 	FreemonoRegular12
 	FreemonoBold12
@@ -73,7 +73,7 @@ func (fr *FontRegistry) GetFont(fontType FontType) FontPrinter {
 // initializeFonts creates and registers all available fonts
 func (fr *FontRegistry) initializeFonts() {
 	fontTypes := []FontType{
-		FremonoRegular18,
+		FreemonoRegular18,
 		FreemonoBold18,
 		FreemonoRegular12,
 		FreemonoBold12,
@@ -96,7 +96,7 @@ func (fr *FontRegistry) initializeFonts() {
 // createFont creates a font instance for the specified type
 func (fr *FontRegistry) createFont(fontType FontType) FontPrinter {
 	switch fontType {
-	case FremonoRegular18:
+	case FreemonoRegular18:
 		return &TinyFontWrapper{
 			display: fr.display,
 			color:   fr.color,
